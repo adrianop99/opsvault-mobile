@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#05070b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="OpsVault">
+<title>OpsVault Mobile — by @aiforge.team</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="lib/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="bg"></div>
+<main id="app"></main>
+<nav id="tabs" class="glass hidden"></nav>
+<div id="sheet-wrap" class="hidden"><div id="sheet-bg"></div><div id="sheet" class="glass"></div></div>
+<div id="toast" class="glass hidden"></div>
+<input id="cam" type="file" accept="image/*" capture="environment" hidden>
+<input id="imp" type="file" accept=".cofre,application/json" hidden>
+<script src="lib/leaflet.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
