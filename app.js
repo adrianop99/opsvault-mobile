@@ -201,9 +201,11 @@ async function viewOp(id) {
   <h2>Alvos (${alvos.length})</h2>
   ${alvos.length ? alvos.map(a => { const p = PRIO[a.prio] || PRIO.media; return `<div class="card glass" onclick="location.hash='#alvo/${a.id}'"><div class="row"><div style="display:flex;gap:12px;align-items:center"><div class="th" style="width:48px;height:48px;flex-shrink:0" data-img="${a.fotos?.[0]?.id || ''}">${a.fotos?.length ? '' : '<div style="display:flex;height:100%;align-items:center;justify-content:center">👤</div>'}</div><div><div class="t">${esc(a.nome)}</div><div class="sub">${esc(a.apelido ? '“' + a.apelido + '”' : '')} ${a.fotos?.length || 0} foto(s) · ${a.locais?.length || 0} local(is)</div></div></div><span class="chip ${p[0]}">${p[1].replace('Prioridade ', '')}</span></div></div>`; }).join('')
   : `<div class="empty"><div>👤</div>Nenhum alvo nesta operação.</div>`}
-  <div class="grid2" style="margin-top:14px"><div class="btn" onclick="location.hash='#mapa'">🗺️ Ver no mapa</div><div class="btn dan" id="del">Excluir operação</div></div>
+  <div class="btn" id="imp_op" style="margin-top:14px">⬆️ Importar alvos em lote</div>
+  <div class="grid2" style="margin-top:10px"><div class="btn" onclick="location.hash='#mapa'">🗺️ Ver no mapa</div><div class="btn dan" id="del">Excluir operação</div></div>
   <div class="btn pri fab" onclick="location.hash='#novoalvo/${id}'">+</div>`;
   $('#ed').onclick = () => opForm(op);
+  $('#imp_op').onclick = () => importBatch(id);
   $('#del').onclick = async () => {
     if (!await confirmBox(`Excluir "${op.nome}" e seus ${alvos.length} alvo(s)?`, 'Excluir', true)) return;
     for (const a of alvos) for (const f of a.fotos || []) await DB.del('img:' + f.id);
@@ -320,6 +322,7 @@ function markPlace(a) {
     <label>Título</label><input id="l_ti" placeholder="Ex.: casa da mãe">
     <label>Observação</label><input id="l_no" placeholder="Opcional">
     <div class="grid2" style="margin-top:14px"><div class="btn" id="l_gps">📡 Estou aqui</div><div class="btn" id="l_map">🗺️ Escolher no mapa</div></div>
+    <div id="l_search" style="margin-top:14px"></div>
     <div id="l_info" class="sub" style="margin:10px 4px"></div><div id="l_box" class="mapbox sm hidden"></div>
     <div class="gap"></div><div class="btn pri" id="l_ok">Salvar local</div>`, s => {
     const info = t => s.querySelector('#l_info').textContent = t;
@@ -333,6 +336,10 @@ function markPlace(a) {
       if (m) m.setLatLng([lat, lng]); else { m = L.marker([lat, lng], {draggable: true, icon: pinIcon(s.querySelector('#l_t').value)}).addTo(map); m.on('dragend', () => { const ll = m.getLatLng(); place(ll.lat, ll.lng); }); } };
     s.querySelector('#l_gps').onclick = async () => { info('Obtendo GPS…'); hold(20000); const g = await geo(); release(); if (!g) return info('⚠️ Não foi possível obter a localização. Use “Escolher no mapa”.'); showMap([g.lat, g.lng], 17); place(g.lat, g.lng, g.acc); };
     s.querySelector('#l_map').onclick = () => { const last = lastPoint(); showMap(last || [-3.7319, -38.5267], last ? 15 : 12); info('Toque no mapa para posicionar o marcador'); };
+    mountSearch(s.querySelector('#l_search'), {
+      getCenter: () => map ? {lat: map.getCenter().lat, lng: map.getCenter().lng} : (lastPoint() ? {lat: lastPoint()[0], lng: lastPoint()[1]} : {lat: -3.7319, lng: -38.5267}),
+      onPick: (lat, lng, label) => { showMap([lat, lng], 17); place(lat, lng); if (label) { const ti = s.querySelector('#l_ti'); if (!ti.value.trim()) ti.value = label; } }
+    });
     s.querySelector('#l_t').onchange = e => m && m.setIcon(pinIcon(e.target.value));
     s.querySelector('#l_ok').onclick = async () => {
       if (!pos) return toast('Defina a posição (GPS ou mapa)');
@@ -347,13 +354,14 @@ const pinIcon = t => { const v = TIPOS[t] || TIPOS.outro; return L.divIcon({clas
 
 /* ---------- Mapa ---------- */
 function viewMapa(aid) {
-  tabs('mapa'); const one = aid ? getAlvo(aid) : null;
+  window._sm = null; tabs('mapa'); const one = aid ? getAlvo(aid) : null;
   const alvos = one ? [one] : S.alvos;
   const pts = [];
   alvos.forEach(a => { (a.locais || []).forEach(l => pts.push({a, lat: l.lat, lng: l.lng, tipo: l.tipo, t: l.titulo || TIPOS[l.tipo]?.[1], n: l.nota, ts: l.ts}));
     (a.fotos || []).filter(f => f.lat).forEach(f => pts.push({a, lat: f.lat, lng: f.lng, tipo: 'foto', t: f.legenda || 'Foto', ts: f.ts})); });
   APP.innerHTML = `${one ? `<div class="back" onclick="location.hash='#alvo/${one.id}'">‹ ${esc(one.nome)}</div>` : ''}
   <div class="top"><div><h1>${one ? 'Mapa do alvo' : 'Mapa geral'}</h1><div class="sub">${pts.length} ponto(s) · ${Object.values(TIPOS).map(v => v[0]).join(' ')}</div></div>${one ? `<div class="btn sm" id="mk">+ Local</div>` : ''}</div>
+  <div id="map_search"></div>
   <div class="mapbox" id="map"></div>
   ${pts.length ? '' : '<div class="sub" style="margin:12px 4px">Nenhum ponto ainda. Marque locais ou tire fotos com GPS na ficha do alvo.</div>'}`;
   const map = L.map('map', {zoomControl: false}); window._map = map;
@@ -361,6 +369,10 @@ function viewMapa(aid) {
   const b = [];
   pts.forEach(p => { b.push([p.lat, p.lng]); L.marker([p.lat, p.lng], {icon: pinIcon(p.tipo)}).addTo(map).bindPopup(`<b>${esc(p.t)}</b><br><span style="color:#8a9bb8">${esc(p.a.nome)} · ${fmt(p.ts)}</span>${p.n ? '<br>' + esc(p.n) : ''}<br><a href="#alvo/${p.a.id}" style="color:#9cbcff">Abrir ficha</a> · <a target="_blank" href="https://maps.google.com/?q=${p.lat},${p.lng}" style="color:#9cbcff">Rota</a>`); });
   if (b.length) map.fitBounds(b, {padding: [40, 40], maxZoom: 16}); else map.setView([-3.7319, -38.5267], 12);
+  mountSearch($('#map_search'), {
+    getCenter: () => ({lat: map.getCenter().lat, lng: map.getCenter().lng}),
+    onPick: (lat, lng, label) => { map.setView([lat, lng], 16); if (window._sm) window._sm.setLatLng([lat, lng]); else window._sm = L.marker([lat, lng], {draggable: true}).addTo(map); window._sm.bindPopup('🔍 Resultado da busca' + (label ? '<br>' + esc(label) : '') + (one ? `<br><a href="#" onclick="markPlace(getAlvo('${one.id}'));return false" style="color:#9cbcff">Marcar como local</a>` : '')).openPopup(); }
+  });
   if (one) $('#mk').onclick = () => markPlace(one);
 }
 
@@ -486,8 +498,11 @@ async function viewCofre() {
   <h2>Backup</h2><div class="card glass" style="padding:0;cursor:default">
     <div class="tgrow" id="bk" style="cursor:pointer"><div>Exportar backup criptografado<div class="sub">arquivo .cofre — só abre com o PIN atual</div></div><span>⬆️</span></div>
     <div class="tgrow" id="rs" style="cursor:pointer"><div>Restaurar backup<div class="sub">substitui os dados deste aparelho</div></div><span>⬇️</span></div></div>
+  <h2>Importar</h2><div class="card glass" style="padding:0;cursor:default">
+    <div class="tgrow" id="imp_lote" style="cursor:pointer"><div>Importar em lote<div class="sub">colar lista ou arquivo .txt/.csv (campos separados por |)</div></div><span>⬆️</span></div></div>
   <h2>Zona de perigo</h2><div class="btn dan" id="wipe">Apagar tudo deste aparelho</div>
-  <h2>Sobre</h2><div class="card glass" style="cursor:default"><div class="t">${esc(APP_NAME)}</div><div class="sub" style="margin-top:4px">Protótipo v0.1 · dados só no aparelho, sem servidor</div><div class="credit" style="text-align:left;margin-top:10px">Criado <b>${esc(CREDIT)}</b></div></div>`;
+  <h2>Sobre</h2><div class="card glass" style="cursor:default"><div class="t">${esc(APP_NAME)}</div><div class="sub" style="margin-top:4px">Protótipo v0.2 · dados só no aparelho, sem servidor</div><div class="credit" style="text-align:left;margin-top:10px">Criado <b>${esc(CREDIT)}</b></div></div>`;
+  $('#imp_lote').onclick = () => importBatch();
   $('#idle').onchange = async e => { S.cfg.idle = +e.target.value; await save(); resetIdle(); toast('Trava automática: ' + S.cfg.idle + ' min'); };
   $('#bk').onclick = async () => {
     toast('Montando backup…'); const keys = (await DB.keys()).filter(k => k.startsWith('img:')); const imgs = {};
@@ -525,6 +540,8 @@ function viewAjuda() {
     ['📷 Fotos com GPS', `<ol><li>Na ficha, toque em <b>Fotografar</b>. A câmera abre e o GPS é lido ao mesmo tempo.</li><li>Na primeira vez, <b>permita câmera e localização</b>.</li><li>A foto vai direto para o cofre, criptografada, com data/hora, coordenadas e um <b>código SHA-256</b> (prova de que não foi alterada).</li><li>A foto <b>não</b> é salva na galeria do celular.</li><li>Toque numa miniatura para ver detalhes ou excluir.</li></ol>`],
     ['📍 Marcar locais', `<ol><li>Na ficha, toque em <b>Marcar local</b>.</li><li>Escolha o tipo (🏠 residência, 🏢 trabalho, 🚗 veículo, 🤝 ponto de encontro, 📍 outro), um título e uma observação.</li><li><b>Estou aqui</b> usa o GPS; <b>Escolher no mapa</b> deixa você tocar no ponto. Arraste o marcador para ajustar.</li></ol>`],
     ['🗺️ Mapa', `<ul><li>A aba <b>Mapa</b> mostra todos os pontos de todos os alvos, com cores por tipo.</li><li>Na ficha, o botão <b>Mapa</b> mostra só aquele alvo.</li><li>Toque num marcador para abrir a ficha ou traçar <b>Rota</b> no Google Maps.</li><li>O fundo do mapa precisa de internet; os pontos ficam no aparelho.</li></ul>`],
+    ['🔎 Busca no mapa', `<p>No topo do mapa (em <b>Marcar local</b> e na aba <b>Mapa</b>) há um campo de busca que aceita:</p><ul><li><b>Coordenadas:</b> <span class="kbd">-3.7319, -38.5267</span>, <span class="kbd">-3.7319 -38.5267</span> ou graus/minutos/segundos (ex.: <span class="kbd">3°43'54"S 38°31'36"W</span>).</li><li><b>Links do Google Maps:</b> cole a URL completa (com <span class="kbd">@lat,lng</span>, <span class="kbd">?q=lat,lng</span>, <span class="kbd">ll=</span> ou <span class="kbd">!3d..!4d..</span>). Links curtos <span class="kbd">maps.app.goo.gl</span> não podem ser resolvidos no aparelho — abra no navegador e copie o link completo ou as coordenadas.</li><li><b>Endereços:</b> digite o endereço e toque em <b>Ir</b>. A busca mostra até 5 resultados; toque num para posicionar o marcador e centralizar o mapa.</li></ul><div class="warn" style="margin-bottom:0">Só o <b>termo pesquisado</b> é enviado ao OpenStreetMap (serviço Nominatim). Os dados do alvo <b>não</b> saem do aparelho.</div>`],
+    ['⬆️ Importar em lote', `<p>Cadastre vários alvos de uma vez. Na aba <b>Cofre</b> → <b>Importar em lote</b>, ou dentro de uma operação em <b>Importar alvos em lote</b> (já preenche aquela operação).</p><p>Um alvo por linha, campos separados por <b>|</b> (barra vertical):</p><div class="kbd" style="display:block;white-space:normal;word-break:break-all;padding:8px 10px;margin:6px 0">operação|nome|vulgo|documento|telefones|veículo|endereço|vínculos|prioridade|lat|lng</div><p><b>Exemplo:</b></p><div class="kbd" style="display:block;white-space:normal;word-break:break-all;padding:8px 10px;margin:6px 0">Operação Aurora|João da Silva|Jota|00000000000|(85) 90000-0000;(85) 90000-0001|Gol prata ABC1D23|Rua Exemplo, 100|Maria (irmã)|alta|-3.7319|-38.5267</div><ul><li><b>Telefones</b> separados por <span class="kbd">;</span> (ponto e vírgula).</li><li><b>Prioridade</b>: alta / média / baixa (padrão média).</li><li><b>lat/lng</b> são opcionais; quando presentes, criam um local 🏠 “Endereço importado”.</li><li>Linhas em branco e que começam com <span class="kbd">#</span> são ignoradas; um cabeçalho iniciado por <span class="kbd">operação|</span> é pulado.</li><li>Pode <b>colar</b> a lista ou carregar um arquivo <b>.txt/.csv</b>. Use <b>Baixar modelo</b> para um exemplo pronto.</li><li>Antes de salvar há uma <b>pré-visualização</b>: válidos, erros (com número da linha), duplicados (por documento ou nome na mesma operação) e as novas operações a criar.</li></ul>`],
     ['🗒️ Anotações e linha do tempo', `<ul><li><b>Anotar</b> registra observações com data e hora automáticas.</li><li>A <b>linha do tempo</b> junta tudo em ordem: cadastro, edições, fotos, locais e notas.</li></ul>`],
     ['🔍 Busca', `Na aba <b>Busca</b>, digite parte de nome, vulgo, placa, telefone, endereço ou texto de anotação. Números são comparados ignorando pontos e traços.`],
     ['📤 Exportar e mandar no WhatsApp', `<ol><li>Na ficha, toque em <b>Exportar / compartilhar</b>.</li><li>Escolha <b>PDF</b> (relatório com fotos, coordenadas e links de mapa) ou <b>Imagem</b> (um card para visualizar rápido).</li><li>Marque o conteúdo e as proteções: mascarar telefone/documento, marca d’água “RESERVADO” e senha no PDF.</li><li>Toque em <b>Gerar e compartilhar</b> e escolha o <b>WhatsApp</b> (ou outro app) na lista do celular.</li></ol><div class="warn" style="margin-bottom:0">O arquivo enviado sai do cofre. Mande a senha do PDF por outro canal. A senha do PDF é uma proteção básica, não substitui o cofre.</div>`],
@@ -534,6 +551,162 @@ function viewAjuda() {
   APP.innerHTML = `<div class="brand">${esc(APP_NAME)}</div><h1>Ajuda</h1><div class="sub" style="margin:4px 4px 14px">Guia rápido. Toque num tópico para abrir.</div>
   <div class="help">${H.map(([t, b], i) => `<details class="glass" ${i === 0 ? 'open' : ''}><summary>${t}</summary><div class="body">${b}</div></details>`).join('')}</div>
   ${credit()}`;
+}
+
+
+/* ============ Busca de local no mapa — by @aiforge.team ============ */
+function validLatLng(lat,lng){ return isFinite(lat)&&isFinite(lng)&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180; }
+function parseDMS(str){
+  const re=/(\d{1,3}(?:\.\d+)?)\s*[°º:\s]\s*(?:(\d{1,2}(?:\.\d+)?)\s*['’′:\s]\s*)?(?:(\d{1,2}(?:\.\d+)?)\s*["”″]?\s*)?([NSLOWnslow])/g;
+  const out=[]; let m;
+  while((m=re.exec(str))){ let d=(+m[1])+(m[2]?+m[2]/60:0)+(m[3]?+m[3]/3600:0); const h=m[4].toUpperCase(); if(h==='S'||h==='W'||h==='O') d=-d; out.push({h,d}); }
+  const lat=out.find(o=>'NS'.includes(o.h)), lng=out.find(o=>'EWLO'.includes(o.h));
+  if(lat&&lng&&validLatLng(lat.d,lng.d)) return {lat:lat.d,lng:lng.d};
+  return null;
+}
+function parseGmaps(str){
+  let m;
+  if((m=str.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/))){ const la=+m[1],lo=+m[2]; if(validLatLng(la,lo))return{lat:la,lng:lo}; }
+  if((m=str.match(/@(-?\d+\.\d+),\s*(-?\d+\.\d+)/))){ const la=+m[1],lo=+m[2]; if(validLatLng(la,lo))return{lat:la,lng:lo}; }
+  if((m=str.match(/[?&#](?:q|query|ll|sll|center|destination|daddr|saddr)=(-?\d+\.\d+)(?:,|%2C|\s)+(-?\d+\.\d+)/i))){ const la=+m[1],lo=+m[2]; if(validLatLng(la,lo))return{lat:la,lng:lo}; }
+  return null;
+}
+function parseLocationInput(str){
+  str=String(str||'').trim(); if(!str) return null;
+  if(/^https?:\/\//i.test(str)||/google|goo\.gl|maps/i.test(str)){
+    if(/(maps\.app\.goo\.gl|goo\.gl\/)/i.test(str)){ const g=parseGmaps(str); if(g) return {type:'coord',...g}; return {type:'shortlink'}; }
+    const g=parseGmaps(str); if(g) return {type:'coord',...g};
+  }
+  let m=str.match(/^\(?\s*(-?\d{1,3}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*\)?$/);
+  if(m){ const la=+m[1],lo=+m[2]; if(validLatLng(la,lo)) return {type:'coord',lat:la,lng:lo}; }
+  const dms=parseDMS(str); if(dms) return {type:'coord',...dms};
+  const g=parseGmaps(str); if(g) return {type:'coord',...g};
+  return null;
+}
+async function geocode(q, center){
+  let vb='';
+  if(center&&isFinite(center.lat)&&isFinite(center.lng)){ const d=0.2; vb=`&viewbox=${center.lng-d},${center.lat+d},${center.lng+d},${center.lat-d}&bounded=0`; }
+  const url=`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=5&countrycodes=br&accept-language=pt-BR`+vb;
+  const r=await fetch(url,{headers:{Accept:'application/json'}}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json();
+}
+function mountSearch(root, cfg){
+  root.innerHTML=`<div class="search glass" style="margin-bottom:8px"><span>🔍</span><input id="ms_q" placeholder="Endereço, coordenadas ou link do Maps" autocomplete="off" style="flex:1;min-width:0"><span class="btn sm" id="ms_go" style="margin:5px">Ir</span></div><div id="ms_note" class="sub hidden" style="margin:0 4px 10px;line-height:1.4"></div><div id="ms_res"></div>`;
+  const q=root.querySelector('#ms_q'), res=root.querySelector('#ms_res');
+  const showNote=()=>{ if(localStorage.getItem('ov_geonote'))return; const n=root.querySelector('#ms_note'); n.classList.remove('hidden'); n.textContent='ℹ️ o termo pesquisado é enviado ao OpenStreetMap; os dados do alvo não saem do aparelho'; localStorage.setItem('ov_geonote','1'); };
+  let busy=false;
+  async function submit(){
+    const v=q.value.trim(); if(!v) return;
+    const pr=parseLocationInput(v);
+    if(pr&&pr.type==='shortlink'){ res.innerHTML='<div class="sub" style="padding:8px 4px;line-height:1.4">🔗 Links curtos (maps.app.goo.gl) não podem ser resolvidos aqui. Abra o link no navegador e cole as coordenadas ou o link completo.</div>'; return; }
+    if(pr&&pr.type==='coord'){ res.innerHTML=''; cfg.onPick(pr.lat,pr.lng,null); toast('📍 Coordenada localizada'); return; }
+    showNote();
+    if(!navigator.onLine){ res.innerHTML='<div class="sub" style="padding:8px 4px">📴 Sem conexão. A busca de endereços precisa de internet.</div>'; return; }
+    if(busy) return; busy=true; res.innerHTML='<div class="sub" style="padding:8px 4px">Buscando…</div>';
+    try{
+      const seen=new Set(); const list=(await geocode(v, cfg.getCenter&&cfg.getCenter())).filter(r=>{ const k=String(r.display_name).replace(/, \d{5}-\d{3}/,''); if(seen.has(k)) return false; seen.add(k); return true; });
+      if(!list.length){ res.innerHTML=`<div class="sub" style="padding:8px 4px">Nada encontrado para "${esc(v)}".</div>`; }
+      else res.innerHTML=list.map((r,i)=>`<div class="card glass msres" data-i="${i}" style="padding:10px 14px"><div class="t" style="font-size:14px">${esc(r.name||String(r.display_name).split(',')[0])}</div><div class="sub">${esc(r.display_name)}</div></div>`).join('');
+      res.querySelectorAll('.msres').forEach(el=>el.onclick=()=>{ const r=list[+el.dataset.i]; const label=String(r.display_name||'').split(',').slice(0,2).join(',').trim(); cfg.onPick(+r.lat,+r.lon,label); });
+    }catch(e){ res.innerHTML=`<div class="sub" style="padding:8px 4px">⚠️ Erro na busca: ${esc(e.message)}. Tente de novo.</div>`; }
+    busy=false;
+  }
+  root.querySelector('#ms_go').onclick=submit;
+  q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } });
+}
+
+/* ============ Importação em lote — by @aiforge.team ============ */
+const BATCH_HEADER='operação|nome|vulgo|documento|telefones|veículo|endereço|vínculos|prioridade|lat|lng';
+const _norm = s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+const _digits = s=>String(s||'').replace(/\D/g,'');
+function normPrio(p){ p=_norm(p); if(p==='alta')return'alta'; if(p==='baixa')return'baixa'; return 'media'; }
+function parseBatch(text){
+  const rows=[];
+  String(text||'').split(/\r?\n/).forEach((raw,idx)=>{
+    const ln=idx+1; const line=raw.trim();
+    if(!line||line.startsWith('#')) return;
+    const low=line.toLowerCase();
+    if(low.startsWith('operação|')||low.startsWith('operacao|')) return;
+    const f=line.split('|').map(x=>x.trim());
+    const row={ln, operacao:f[0]||'', nome:f[1]||'', vulgo:f[2]||'', doc:f[3]||'', tels:(f[4]||'').split(';').map(x=>x.trim()).filter(Boolean), veic:f[5]||'', end:f[6]||'', vinc:f[7]||'', prio:normPrio(f[8]), lat:null, lng:null, errs:[]};
+    if(!row.nome) row.errs.push('nome vazio');
+    const rawLat=f[9], rawLng=f[10];
+    if((rawLat&&rawLat.length)||(rawLng&&rawLng.length)){
+      const la=parseFloat(String(rawLat).replace(',','.')), lo=parseFloat(String(rawLng).replace(',','.'));
+      if(!validLatLng(la,lo)) row.errs.push('lat/lng inválidos'); else { row.lat=la; row.lng=lo; }
+    }
+    rows.push(row);
+  });
+  return rows;
+}
+function importBatch(defaultOpId){
+  const defOp = defaultOpId ? getOp(defaultOpId) : null;
+  sheet(`<h2 style="margin-top:0">Importar em lote</h2>
+    <div class="sub" style="margin:0 0 8px;line-height:1.4">Um alvo por linha, campos separados por <b>|</b> (barra vertical):</div>
+    <div class="card glass" style="cursor:default;padding:10px 12px;font-size:11px;word-break:break-all;color:#9cbcff">${esc(BATCH_HEADER)}</div>
+    ${defOp?`<div class="sub" style="margin:8px 4px">Operação padrão (quando o campo <b>operação</b> ficar vazio): <b>${esc(defOp.nome)}</b></div>`:''}
+    <label>Colar lista</label><textarea id="ib_t" style="min-height:140px" placeholder="Cole aqui ou use o arquivo…"></textarea>
+    <div class="grid2" style="margin-top:12px"><div class="btn" id="ib_file">📄 Arquivo .txt/.csv</div><div class="btn" id="ib_modelo">⬇️ Baixar modelo</div></div>
+    <div class="gap"></div><div class="btn pri" id="ib_prev">Pré-visualizar</div>
+    <div class="credit">${esc(APP_NAME)} · <b>${esc(CREDIT)}</b></div>`, s=>{
+    s.querySelector('#ib_modelo').onclick=()=>modeloBatch();
+    s.querySelector('#ib_file').onclick=()=>{
+      const inp=document.createElement('input'); inp.type='file'; inp.accept='.txt,.csv,text/plain,text/csv'; hold(120000);
+      inp.onchange=async()=>{ release(); const f=inp.files[0]; if(!f) return; try{ s.querySelector('#ib_t').value=await f.text(); toast('Arquivo carregado'); }catch(e){ toast('Erro ao ler: '+e.message); } };
+      inp.click();
+    };
+    s.querySelector('#ib_prev').onclick=()=>{ const txt=s.querySelector('#ib_t').value; if(!txt.trim()) return toast('Cole a lista ou escolha um arquivo'); previewBatch(txt, defaultOpId); };
+  });
+}
+function modeloBatch(){
+  const txt=[BATCH_HEADER,
+    'Operação Exemplo|João da Silva (fictício)|Jota|00000000000|(85) 90000-0000;(85) 90000-0001|Fiat Uno branco XYZ0A00|Rua Fictícia, 123 - Centro|Maria (fictícia, irmã)|alta|-3.7319|-38.5267',
+    'Operação Exemplo|Maria Souza (fictícia)|Mari|11111111111|(85) 91111-1111|sem veículo|Av. Inventada, 456 - Bairro|João (fictício, irmão)|média|-3.7330|-38.5240'
+  ].join('\n')+'\n';
+  shareFile(new File([txt],`OpsVault_modelo_importacao_${fileStamp()}.txt`,{type:'text/plain'}));
+}
+function previewBatch(text, defaultOpId){
+  const defOp = defaultOpId ? getOp(defaultOpId) : null;
+  const rows = parseBatch(text);
+  if(!rows.length) return toast('Nenhuma linha para importar');
+  const existingOpByName={}; S.ops.forEach(o=>existingOpByName[_norm(o.nome)]=o);
+  rows.forEach(r=>{ r.opName = r.operacao || (defOp?defOp.nome:''); if(!r.opName && !r.errs.includes('operação vazia')) r.errs.push('operação vazia'); });
+  rows.forEach(r=>{ r.dup=null; if(r.errs.length) return; const rd=_digits(r.doc); const opKey=_norm(r.opName);
+    r.dup=S.alvos.find(a=>{ if(rd && _digits(a.doc)===rd) return true; if(_norm(a.nome)===_norm(r.nome)){ const ao=getOp(a.opId); if(ao&&_norm(ao.nome)===opKey) return true; } return false; })||null; });
+  const valid=rows.filter(r=>!r.errs.length);
+  const errRows=rows.filter(r=>r.errs.length);
+  const dups=valid.filter(r=>r.dup);
+  const state={impDup:false};
+  const render=()=>{
+    const toImp=valid.filter(r=>!r.dup||state.impDup); const willImport=toImp.length;
+    const newOpNames=[]; toImp.forEach(r=>{ const key=_norm(r.opName); if(!existingOpByName[key] && !newOpNames.some(n=>_norm(n)===key)) newOpNames.push(r.opName); });
+    sheet(`<h2 style="margin-top:0">Pré-visualização</h2>
+      <div class="card glass" style="cursor:default"><div class="row"><div>✅ Válidos</div><b>${valid.length}</b></div><div class="row" style="margin-top:6px"><div>⚠️ Com erro</div><b>${errRows.length}</b></div><div class="row" style="margin-top:6px"><div>🔁 Duplicados</div><b>${dups.length}</b></div><div class="row" style="margin-top:6px"><div>⬆️ Serão importados</div><b>${willImport}</b></div></div>
+      ${newOpNames.length?`<h2>Novas operações (${newOpNames.length})</h2><div class="card glass" style="cursor:default;padding:10px 14px;font-size:13px">${newOpNames.map(n=>'🗂️ '+esc(n)).join('<br>')}</div>`:''}
+      ${errRows.length?`<h2>Linhas com erro (${errRows.length})</h2><div class="card glass" style="cursor:default;padding:10px 14px;font-size:13px;max-height:170px;overflow:auto">${errRows.map(r=>`Linha ${r.ln}: ${esc(r.nome||'(sem nome)')} — <span style="color:#ffadad">${esc(r.errs.join(', '))}</span>`).join('<br>')}</div>`:''}
+      ${dups.length?`<h2>Duplicados (${dups.length})</h2><div class="tgrow card glass" style="cursor:default"><div>Importar duplicados mesmo assim<div class="sub">por padrão são ignorados</div></div><div class="tg ${state.impDup?'on':''}" id="ib_dtg"></div></div><div class="card glass" style="cursor:default;padding:10px 14px;font-size:13px;max-height:150px;overflow:auto">${dups.map(r=>`Linha ${r.ln}: ${esc(r.nome)} — já existe como <b>${esc(r.dup.nome)}</b>`).join('<br>')}</div>`:''}
+      <h2>Serão importados</h2><div class="card glass" style="cursor:default;padding:10px 14px;font-size:13px;max-height:180px;overflow:auto">${valid.map(r=>`${r.dup&&!state.impDup?'⏭️':'➕'} ${esc(r.nome)} <span class="sub">· ${esc(r.opName)}${r.lat!=null?' · 📍':''}</span>`).join('<br>')||'<span class="sub">nenhuma linha válida</span>'}</div>
+      <div class="gap"></div><div class="grid2"><div class="btn" id="ib_cancel">Cancelar</div><div class="btn pri" id="ib_save">Importar ${willImport}</div></div>`, s=>{
+      const dtg=s.querySelector('#ib_dtg'); if(dtg) dtg.onclick=()=>{ state.impDup=!state.impDup; render(); };
+      s.querySelector('#ib_cancel').onclick=closeSheet;
+      s.querySelector('#ib_save').onclick=()=>doImportBatch(valid, newOpNames, state);
+    });
+  };
+  render();
+}
+async function doImportBatch(valid, newOpNames, state){
+  const opMap={}; S.ops.forEach(o=>opMap[_norm(o.nome)]=o.id);
+  newOpNames.forEach(n=>{ if(!opMap[_norm(n)]){ const id=uid(); S.ops.push({id,nome:n,status:'planejada',desc:'',ts:Date.now()}); opMap[_norm(n)]=id; } });
+  let count=0;
+  valid.forEach(r=>{
+    if(r.dup&&!state.impDup) return;
+    const opId=opMap[_norm(r.opName)]; if(!opId) return;
+    const now=Date.now(); const locais=[];
+    if(r.lat!=null) locais.push({id:uid(), ts:now, tipo:'residencia', titulo:'Endereço importado', nota:'', lat:r.lat, lng:r.lng, acc:null});
+    S.alvos.push({id:uid(), opId, nome:r.nome, apelido:r.vulgo, doc:r.doc, prio:r.prio, tels:r.tels, veic:r.veic, end:r.end, vinc:r.vinc, fotos:[], locais, notas:[], log:[{ts:now, t:'Importado em lote'}], ts:now});
+    count++;
+  });
+  await save(); closeSheet(); route();
+  toast(`✔ ${count} alvo(s) importado(s)${newOpNames.length?` · ${newOpNames.length} nova(s) operação(ões)`:''}`);
 }
 
 /* ---------- Início ---------- */
