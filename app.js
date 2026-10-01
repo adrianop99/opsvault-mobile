@@ -504,7 +504,7 @@ async function viewCofre() {
     <div class="tgrow" id="imp_lote" style="cursor:pointer"><div>Importar em lote<div class="sub">colar lista ou arquivo .txt/.csv (campos separados por |)</div></div><span>⬆️</span></div>
     <div class="tgrow" id="imp_opv" style="cursor:pointer"><div>Importar operação<div class="sub">arquivo .opsvault vindo de outro aparelho — junta com os dados atuais</div></div><span>📦</span></div></div>
   <h2>Zona de perigo</h2><div class="btn dan" id="wipe">Apagar tudo deste aparelho</div>
-  <h2>Sobre</h2><div class="card glass" style="cursor:default"><div class="t">${esc(APP_NAME)}</div><div class="sub" style="margin-top:4px">Protótipo v0.3 · dados só no aparelho, sem servidor</div><div class="credit" style="text-align:left;margin-top:10px">Criado <b>${esc(CREDIT)}</b></div></div>`;
+  <h2>Sobre</h2><div class="card glass" style="cursor:default"><div class="t">${esc(APP_NAME)}</div><div class="sub" style="margin-top:4px">Protótipo v0.3.1 · dados só no aparelho, sem servidor</div><div class="credit" style="text-align:left;margin-top:10px">Criado <b>${esc(CREDIT)}</b></div></div>`;
   $('#imp_lote').onclick = () => importBatch();
   $('#imp_opv').onclick = () => importOpUI();
   $('#idle').onchange = async e => { S.cfg.idle = +e.target.value; await save(); resetIdle(); toast('Trava automática: ' + S.cfg.idle + ' min'); };
@@ -514,11 +514,11 @@ async function viewCofre() {
     const f = new File([JSON.stringify({app: 'opsvault', v: 1, ts: Date.now(), meta: await DB.get('meta'), data: await DB.get('data'), imgs})], `OpsVault_backup_${fileStamp()}.cofre`, {type: 'application/json'});
     await shareFile(f);
   };
-  $('#rs').onclick = () => { const inp = $('#imp'); inp.value = ''; hold(120000); inp.onchange = async () => { release(); const file = inp.files[0]; if (!file) return;
+  $('#rs').onclick = () => { pickFile(null, async file => {
     try { const j = JSON.parse(await file.text()); if (j.app !== 'opsvault' || !j.meta || !j.data) throw new Error('arquivo inválido');
       if (!await confirmBox('Restaurar substitui TODOS os dados atuais. Depois, use o PIN do backup para abrir.', 'Restaurar', true)) return;
       await DB.clear(); await DB.set('meta', j.meta); await DB.set('data', j.data); for (const [k, v] of Object.entries(j.imgs || {})) await DB.set(k, v);
-      lock('backup restaurado'); } catch (e) { toast('Erro: ' + e.message); } }; inp.click(); };
+      lock('backup restaurado'); } catch (e) { toast('Erro: ' + e.message); } }); };
   $('#wipe').onclick = async () => { if (!await confirmBox('Apagar TODOS os dados? Não há como desfazer.', 'Apagar tudo', true)) return; if (!await confirmBox('Tem certeza absoluta?', 'Sim, apagar', true)) return; await DB.clear(); localStorage.clear(); lock('dados apagados'); };
   $('#chpin').onclick = () => sheet(`<h2 style="margin-top:0">Trocar PIN</h2><label>PIN atual</label><input id="p0" type="password" inputmode="numeric"><label>Novo PIN (mín. 6 dígitos)</label><input id="p1" type="password" inputmode="numeric"><label>Confirmar novo PIN</label><input id="p2" type="password" inputmode="numeric"><div class="gap"></div><div class="btn pri" id="pok">Trocar e recriptografar</div>`, s => {
     s.querySelector('#pok').onclick = async () => {
@@ -655,9 +655,7 @@ function importBatch(defaultOpId){
     <div class="credit">${esc(APP_NAME)} · <b>${esc(CREDIT)}</b></div>`, s=>{
     s.querySelector('#ib_modelo').onclick=()=>modeloBatch();
     s.querySelector('#ib_file').onclick=()=>{
-      const inp=document.createElement('input'); inp.type='file'; inp.accept='.txt,.csv,text/plain,text/csv'; hold(120000);
-      inp.onchange=async()=>{ release(); const f=inp.files[0]; if(!f) return; try{ s.querySelector('#ib_t').value=await f.text(); toast('Arquivo carregado'); }catch(e){ toast('Erro ao ler: '+e.message); } };
-      inp.click();
+      pickFile('.txt,.csv,text/plain,text/csv', async f=>{ try{ s.querySelector('#ib_t').value=await f.text(); toast('Arquivo carregado'); }catch(e){ toast('Erro ao ler: '+e.message); } });
     };
     s.querySelector('#ib_prev').onclick=()=>{ const txt=s.querySelector('#ib_t').value; if(!txt.trim()) return toast('Cole a lista ou escolha um arquivo'); previewBatch(txt, defaultOpId); };
   });
@@ -712,6 +710,17 @@ async function doImportBatch(valid, newOpNames, state){
   });
   await save(); closeSheet(); route();
   toast(`✔ ${count} alvo(s) importado(s)${newOpNames.length?` · ${newOpNames.length} nova(s) operação(ões)`:''}`);
+}
+
+
+/* Seletor de arquivo compatível com iPhone: input fixo no DOM, sem accept para tipos desconhecidos */
+function pickFile(accept, cb) {
+  let inp = document.getElementById('pick');
+  if (!inp) { inp = document.createElement('input'); inp.type = 'file'; inp.id = 'pick'; inp.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0'; document.body.appendChild(inp); }
+  if (accept) inp.setAttribute('accept', accept); else inp.removeAttribute('accept');
+  inp.value = ''; hold(180000);
+  inp.onchange = () => { release(); const f = inp.files && inp.files[0]; if (f) cb(f); };
+  inp.click();
 }
 
 /* ============ Exportar / importar operação (outro aparelho) — by @aiforge.team ============ */
@@ -783,15 +792,13 @@ async function mergeOpPackage(pkg, mode) {
   return {op, nAlvos: alvos.length, nFotos: nf, miss};
 }
 function importOpUI() {
-  const inp = document.createElement('input'); inp.type = 'file';
-  if (!/Android/i.test(navigator.userAgent)) inp.accept = '.opsvault,application/octet-stream,application/json'; // no Android, o seletor esconde extensões desconhecidas
-  hold(180000);
-  inp.onchange = async () => { release(); const file = inp.files[0]; if (!file) return;
+  pickFile(null, async file => {
     let text; try { text = await file.text(); } catch (e) { return toast('Erro ao ler: ' + e.message); }
-    try { const j = JSON.parse(text); if (!j || j.app !== OPPKG_APP) throw 0; } catch { return toast('Arquivo inválido (não é uma operação do OpsVault)'); }
+    let j; try { j = JSON.parse(text); } catch { return toast('Arquivo inválido (não é uma operação do OpsVault)'); }
+    if (j && j.app === 'opsvault') return toast('Este é um backup completo (.cofre). Use “Restaurar backup”.', 4200);
+    if (!j || j.app !== OPPKG_APP) return toast('Arquivo inválido (não é uma operação do OpsVault)');
     importOpPassword(text, file.name);
-  };
-  inp.click();
+  });
 }
 function importOpPassword(text, name) {
   sheet(`<h2 style="margin-top:0">📦 Importar operação</h2><div class="sub" style="word-break:break-all">${esc(name || '')}</div>
