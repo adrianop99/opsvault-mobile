@@ -90,7 +90,7 @@ textarea{min-height:90px;resize:vertical}
 .seg div{flex:1;text-align:center;padding:10px;border-radius:12px;font-size:14px;font-weight:600;color:#8a9bb8;cursor:pointer}
 .seg .on{background:rgba(77,134,255,.3);color:#dbe6ff}
 .warn{padding:12px 14px;border-radius:16px;font-size:13px;color:#ffcf8a;background:rgba(255,170,60,.08);border:1px solid rgba(255,170,60,.25);margin:12px 0}
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 96px);padding:11px 18px;border-radius:999px;font-size:13.5px;z-index:60;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 96px);padding:11px 18px;border-radius:999px;font-size:13.5px;z-index:60;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 .viewer{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:70;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
 .viewer img{max-width:100%;max-height:70vh;border-radius:14px}
 .help details{margin-bottom:10px;padding:0}

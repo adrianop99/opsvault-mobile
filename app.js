@@ -202,10 +202,12 @@ async function viewOp(id) {
   ${alvos.length ? alvos.map(a => { const p = PRIO[a.prio] || PRIO.media; return `<div class="card glass" onclick="location.hash='#alvo/${a.id}'"><div class="row"><div style="display:flex;gap:12px;align-items:center"><div class="th" style="width:48px;height:48px;flex-shrink:0" data-img="${a.fotos?.[0]?.id || ''}">${a.fotos?.length ? '' : '<div style="display:flex;height:100%;align-items:center;justify-content:center">👤</div>'}</div><div><div class="t">${esc(a.nome)}</div><div class="sub">${esc(a.apelido ? '“' + a.apelido + '”' : '')} ${a.fotos?.length || 0} foto(s) · ${a.locais?.length || 0} local(is)</div></div></div><span class="chip ${p[0]}">${p[1].replace('Prioridade ', '')}</span></div></div>`; }).join('')
   : `<div class="empty"><div>👤</div>Nenhum alvo nesta operação.</div>`}
   <div class="btn" id="imp_op" style="margin-top:14px">⬆️ Importar alvos em lote</div>
+  <div class="btn" id="exp_op" style="margin-top:10px">📦 Exportar operação (outro aparelho)</div>
   <div class="grid2" style="margin-top:10px"><div class="btn" onclick="location.hash='#mapa'">🗺️ Ver no mapa</div><div class="btn dan" id="del">Excluir operação</div></div>
   <div class="btn pri fab" onclick="location.hash='#novoalvo/${id}'">+</div>`;
   $('#ed').onclick = () => opForm(op);
   $('#imp_op').onclick = () => importBatch(id);
+  $('#exp_op').onclick = () => exportOpUI(op);
   $('#del').onclick = async () => {
     if (!await confirmBox(`Excluir "${op.nome}" e seus ${alvos.length} alvo(s)?`, 'Excluir', true)) return;
     for (const a of alvos) for (const f of a.fotos || []) await DB.del('img:' + f.id);
@@ -499,10 +501,12 @@ async function viewCofre() {
     <div class="tgrow" id="bk" style="cursor:pointer"><div>Exportar backup criptografado<div class="sub">arquivo .cofre — só abre com o PIN atual</div></div><span>⬆️</span></div>
     <div class="tgrow" id="rs" style="cursor:pointer"><div>Restaurar backup<div class="sub">substitui os dados deste aparelho</div></div><span>⬇️</span></div></div>
   <h2>Importar</h2><div class="card glass" style="padding:0;cursor:default">
-    <div class="tgrow" id="imp_lote" style="cursor:pointer"><div>Importar em lote<div class="sub">colar lista ou arquivo .txt/.csv (campos separados por |)</div></div><span>⬆️</span></div></div>
+    <div class="tgrow" id="imp_lote" style="cursor:pointer"><div>Importar em lote<div class="sub">colar lista ou arquivo .txt/.csv (campos separados por |)</div></div><span>⬆️</span></div>
+    <div class="tgrow" id="imp_opv" style="cursor:pointer"><div>Importar operação<div class="sub">arquivo .opsvault vindo de outro aparelho — junta com os dados atuais</div></div><span>📦</span></div></div>
   <h2>Zona de perigo</h2><div class="btn dan" id="wipe">Apagar tudo deste aparelho</div>
-  <h2>Sobre</h2><div class="card glass" style="cursor:default"><div class="t">${esc(APP_NAME)}</div><div class="sub" style="margin-top:4px">Protótipo v0.2 · dados só no aparelho, sem servidor</div><div class="credit" style="text-align:left;margin-top:10px">Criado <b>${esc(CREDIT)}</b></div></div>`;
+  <h2>Sobre</h2><div class="card glass" style="cursor:default"><div class="t">${esc(APP_NAME)}</div><div class="sub" style="margin-top:4px">Protótipo v0.3 · dados só no aparelho, sem servidor</div><div class="credit" style="text-align:left;margin-top:10px">Criado <b>${esc(CREDIT)}</b></div></div>`;
   $('#imp_lote').onclick = () => importBatch();
+  $('#imp_opv').onclick = () => importOpUI();
   $('#idle').onchange = async e => { S.cfg.idle = +e.target.value; await save(); resetIdle(); toast('Trava automática: ' + S.cfg.idle + ' min'); };
   $('#bk').onclick = async () => {
     toast('Montando backup…'); const keys = (await DB.keys()).filter(k => k.startsWith('img:')); const imgs = {};
@@ -546,6 +550,7 @@ function viewAjuda() {
     ['🔍 Busca', `Na aba <b>Busca</b>, digite parte de nome, vulgo, placa, telefone, endereço ou texto de anotação. Números são comparados ignorando pontos e traços.`],
     ['📤 Exportar e mandar no WhatsApp', `<ol><li>Na ficha, toque em <b>Exportar / compartilhar</b>.</li><li>Escolha <b>PDF</b> (relatório com fotos, coordenadas e links de mapa) ou <b>Imagem</b> (um card para visualizar rápido).</li><li>Marque o conteúdo e as proteções: mascarar telefone/documento, marca d’água “RESERVADO” e senha no PDF.</li><li>Toque em <b>Gerar e compartilhar</b> e escolha o <b>WhatsApp</b> (ou outro app) na lista do celular.</li></ol><div class="warn" style="margin-bottom:0">O arquivo enviado sai do cofre. Mande a senha do PDF por outro canal. A senha do PDF é uma proteção básica, não substitui o cofre.</div>`],
     ['💾 Backup e restauração', `<ol><li>Aba <b>Cofre</b> → <b>Exportar backup criptografado</b> gera um arquivo <span class="kbd">.cofre</span>.</li><li>Ele continua criptografado e só abre com o PIN que estava em uso na hora do backup.</li><li>Para trocar de celular: instale o app no novo aparelho, crie qualquer PIN, vá em <b>Restaurar backup</b> e depois abra com o PIN antigo.</li></ol>`],
+    ['📦 Passar uma operação para outro aparelho', `<p>Serve para mandar <b>uma operação</b> (com seus alvos, fotos, locais e anotações) para o celular de um colega ou para outro aparelho seu.</p><ol><li>Abra a operação e toque em <b>📦 Exportar operação (outro aparelho)</b>.</li><li>Crie uma <b>senha de transferência</b> (mínimo 6 caracteres) e confirme. Ela é só para este arquivo — não é o seu PIN.</li><li>Envie o arquivo <span class="kbd">.opsvault</span> (WhatsApp, e-mail, cabo…). <b>Mande a senha por outro canal</b> (ligação, pessoalmente, outro app).</li><li>No outro aparelho: aba <b>Cofre</b> → <b>Importar operação</b>, escolha o arquivo e digite a senha de transferência.</li><li>Confira a pré-visualização (operação, nº de alvos e fotos) e toque em <b>Importar</b>.</li></ol><ul><li>A operação é <b>somada</b> ao que já existe; nada do aparelho é apagado.</li><li>Se a mesma operação já existir, escolha <b>Substituir a existente</b> (apaga a antiga, seus alvos e fotos, e põe a recebida no lugar) ou <b>Importar como cópia</b> (fica com as duas; a nova recebe “(cópia)” no nome).</li><li>As fotos são recriptografadas com o PIN do aparelho que recebeu. Cada alvo ganha o registro “Importado de outro aparelho” na linha do tempo.</li></ul><p><b>Diferença para o backup completo:</b> o backup <span class="kbd">.cofre</span> leva <b>o cofre inteiro</b>, só abre com o <b>PIN do backup</b> e, ao restaurar, <b>substitui tudo</b> o que está no aparelho. A exportação de operação leva <b>só uma operação</b>, abre com a <b>senha de transferência</b> e <b>junta</b> com os dados existentes.</p><div class="warn" style="margin-bottom:0">O arquivo .opsvault é criptografado (AES-256) com a senha de transferência. Quem tiver o arquivo <b>e</b> a senha vê tudo da operação — por isso nunca mande os dois juntos.</div>`],
     ['🛡️ Segurança', `<ul><li>O app trava sozinho após inatividade (ajuste na aba Cofre) e sempre que sai da tela.</li><li>Nada é enviado para servidor: sem nuvem, sem conta.</li><li>Use um PIN diferente do desbloqueio do celular.</li><li>Antes de usar em serviço, confirme a política da sua instituição e a LGPD para dados de investigação.</li></ul>`]
   ];
   APP.innerHTML = `<div class="brand">${esc(APP_NAME)}</div><h1>Ajuda</h1><div class="sub" style="margin:4px 4px 14px">Guia rápido. Toque num tópico para abrir.</div>
@@ -707,6 +712,126 @@ async function doImportBatch(valid, newOpNames, state){
   });
   await save(); closeSheet(); route();
   toast(`✔ ${count} alvo(s) importado(s)${newOpNames.length?` · ${newOpNames.length} nova(s) operação(ões)`:''}`);
+}
+
+/* ============ Exportar / importar operação (outro aparelho) — by @aiforge.team ============ */
+const OPPKG_APP = 'opsvault-op';
+async function buildOpPackage(opId, pw) {
+  const op = getOp(opId); if (!op) throw new Error('operação não encontrada');
+  const alvos = S.alvos.filter(a => a.opId === opId);
+  const imgs = {}; let miss = 0;
+  for (const a of alvos) for (const f of a.fotos || []) { const box = await DB.get('img:' + f.id); if (!box) { miss++; continue; } imgs[f.id] = b64(await open_(KEY, box)); }
+  const pkg = {app: OPPKG_APP + '-pkg', v: 1, ts: Date.now(), by: CREDIT, op: JSON.parse(JSON.stringify(op)), alvos: JSON.parse(JSON.stringify(alvos)), imgs};
+  const salt = crypto.getRandomValues(new Uint8Array(16)); const k = await deriveKey(pw, salt);
+  const out = {app: OPPKG_APP, v: 1, salt: b64(salt), box: await seal(k, enc.encode(JSON.stringify(pkg)))};
+  const file = new File([JSON.stringify(out)], `OpsVault_op_${slug(op.nome)}_${fileStamp()}.opsvault`, {type: 'application/octet-stream'});
+  return {file, nAlvos: alvos.length, nFotos: Object.keys(imgs).length, miss};
+}
+function exportOpUI(op) {
+  const alvos = S.alvos.filter(a => a.opId === op.id); const nf = alvos.reduce((s, a) => s + (a.fotos?.length || 0), 0);
+  sheet(`<h2 style="margin-top:0">📦 Exportar operação</h2>
+    <div class="sub" style="line-height:1.4"><b>${esc(op.nome)}</b> · ${alvos.length} alvo(s) · ${nf} foto(s)</div>
+    <label>Senha de transferência (mín. 6 caracteres)</label><input id="xo_p1" type="password" autocomplete="new-password">
+    <label>Confirmar senha</label><input id="xo_p2" type="password" autocomplete="new-password">
+    <div class="warn">⚠️ Envie a <b>senha por outro canal</b> (ligação, pessoalmente, outro app) — nunca junto com o arquivo. Quem tiver os dois abre a operação inteira.</div>
+    <div class="btn pri" id="xo_ok">Gerar arquivo .opsvault</div>
+    <div class="credit">${esc(APP_NAME)} · <b>${esc(CREDIT)}</b></div>`, s => {
+    const b = s.querySelector('#xo_ok'); let busy = false;
+    b.onclick = async () => {
+      if (busy) return; const p1 = s.querySelector('#xo_p1').value, p2 = s.querySelector('#xo_p2').value;
+      if (p1.length < 6) return toast('A senha precisa ter pelo menos 6 caracteres'); if (p1 !== p2) return toast('As senhas não conferem');
+      busy = true; b.textContent = 'Criptografando…';
+      try { const r = await buildOpPackage(op.id, p1); closeSheet(); await shareFile(r.file); setTimeout(() => toast(`📦 ${r.nAlvos} alvo(s), ${r.nFotos} foto(s) exportados. Envie a senha por outro canal!`, 4200), 2700); }
+      catch (e) { console.error(e); toast('Erro: ' + e.message); busy = false; b.textContent = 'Gerar arquivo .opsvault'; }
+    };
+  });
+}
+async function openOpPackage(text, pw) {
+  let j; try { j = JSON.parse(text); } catch { throw new Error('Arquivo inválido (não é uma operação do OpsVault)'); }
+  if (!j || j.app !== OPPKG_APP || !j.salt || !j.box) throw new Error('Arquivo inválido (não é uma operação do OpsVault)');
+  let pkg;
+  try { const k = await deriveKey(pw, unb64(j.salt)); pkg = JSON.parse(dec.decode(await open_(k, j.box))); }
+  catch { const e = new Error('Senha incorreta ou arquivo corrompido'); e.badPw = true; throw e; }
+  if (!pkg || !pkg.op || !pkg.op.id || !Array.isArray(pkg.alvos)) { const e = new Error('Senha incorreta ou arquivo corrompido'); e.badPw = true; throw e; }
+  pkg.imgs = pkg.imgs || {};
+  return pkg;
+}
+// mode: 'new' (sem conflito) | 'replace' | 'copy'
+async function mergeOpPackage(pkg, mode) {
+  const op = JSON.parse(JSON.stringify(pkg.op)), alvos = JSON.parse(JSON.stringify(pkg.alvos)), now = Date.now();
+  if (mode === 'replace') {
+    const old = S.alvos.filter(a => a.opId === op.id);
+    for (const a of old) for (const f of a.fotos || []) { await DB.del('img:' + f.id); if (imgCache.has(f.id)) { URL.revokeObjectURL(imgCache.get(f.id)); imgCache.delete(f.id); } }
+    S.alvos = S.alvos.filter(a => a.opId !== op.id); S.ops = S.ops.filter(o => o.id !== op.id);
+  }
+  const copy = mode === 'copy';
+  if (copy || getOp(op.id)) { op.id = uid(); if (copy) op.nome = op.nome + ' (cópia)'; }
+  const aIds = new Set(S.alvos.map(a => a.id)); const fIds = new Set(S.alvos.flatMap(a => (a.fotos || []).map(f => f.id)));
+  let nf = 0, miss = 0;
+  for (const a of alvos) {
+    if (copy || aIds.has(a.id)) a.id = uid(); aIds.add(a.id); a.opId = op.id;
+    const fotos = [];
+    for (const f of a.fotos || []) {
+      const data = pkg.imgs[f.id]; if (!data) { miss++; continue; }
+      if (copy || fIds.has(f.id)) f.id = uid(); fIds.add(f.id);
+      await putImg(f.id, unb64(data)); fotos.push(f); nf++;
+    }
+    a.fotos = fotos; a.locais = a.locais || []; a.notas = a.notas || []; a.log = a.log || [];
+    a.log.push({ts: now, t: 'Importado de outro aparelho'});
+  }
+  S.ops.push(op); S.alvos.push(...alvos); await save();
+  return {op, nAlvos: alvos.length, nFotos: nf, miss};
+}
+function importOpUI() {
+  const inp = document.createElement('input'); inp.type = 'file';
+  if (!/Android/i.test(navigator.userAgent)) inp.accept = '.opsvault,application/octet-stream,application/json'; // no Android, o seletor esconde extensões desconhecidas
+  hold(180000);
+  inp.onchange = async () => { release(); const file = inp.files[0]; if (!file) return;
+    let text; try { text = await file.text(); } catch (e) { return toast('Erro ao ler: ' + e.message); }
+    try { const j = JSON.parse(text); if (!j || j.app !== OPPKG_APP) throw 0; } catch { return toast('Arquivo inválido (não é uma operação do OpsVault)'); }
+    importOpPassword(text, file.name);
+  };
+  inp.click();
+}
+function importOpPassword(text, name) {
+  sheet(`<h2 style="margin-top:0">📦 Importar operação</h2><div class="sub" style="word-break:break-all">${esc(name || '')}</div>
+    <label>Senha de transferência</label><input id="io_pw" type="password" autocomplete="off">
+    <div class="err" id="io_err" style="color:#ff8a8a;font-size:13px;margin:8px 4px;min-height:16px"></div>
+    <div class="btn pri" id="io_ok">Abrir arquivo</div>`, s => {
+    const b = s.querySelector('#io_ok'), pw = s.querySelector('#io_pw'); let busy = false; pw.focus();
+    const go = async () => {
+      if (busy || !pw.value) return; busy = true; b.textContent = 'Descriptografando…'; s.querySelector('#io_err').textContent = '';
+      try { const pkg = await openOpPackage(text, pw.value); importOpPreview(pkg); }
+      catch (e) { busy = false; b.textContent = 'Abrir arquivo'; s.querySelector('#io_err').textContent = e.message; toast(e.message); pw.value = ''; pw.focus(); }
+    };
+    b.onclick = go; pw.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+  });
+}
+function importOpPreview(pkg) {
+  const nf = pkg.alvos.reduce((s, a) => s + (a.fotos?.length || 0), 0); const exists = getOp(pkg.op.id);
+  const st = STATUS[pkg.op.status] || STATUS.planejada; $('#toast').classList.add('hidden');
+  sheet(`<h2 style="margin-top:0">Pré-visualização</h2>
+    <div class="card glass" style="cursor:default"><div class="row"><div class="t">${esc(pkg.op.nome)}</div><span class="chip ${st[0]}">${st[1]}</span></div>
+      <div class="row" style="margin-top:8px"><div>👤 Alvos</div><b id="io_na">${pkg.alvos.length}</b></div><div class="row" style="margin-top:6px"><div>📷 Fotos</div><b id="io_nf">${nf}</b></div>
+      ${pkg.ts ? `<div class="sub" style="margin-top:6px">Exportada em ${fmt(pkg.ts)}</div>` : ''}</div>
+    <div class="card glass" style="cursor:default;padding:10px 14px;font-size:13px;max-height:150px;overflow:auto">${pkg.alvos.map(a => `👤 ${esc(a.nome)} <span class="sub">· ${a.fotos?.length || 0} foto(s)</span>`).join('<br>') || '<span class="sub">sem alvos</span>'}</div>
+    ${exists ? `<div class="warn">⚠️ Esta operação já existe neste aparelho (<b>${esc(exists.nome)}</b>, ${S.alvos.filter(a => a.opId === exists.id).length} alvo(s)). O que fazer?</div>
+      <div class="btn dan" id="io_rep">Substituir a existente</div><div class="btn pri" id="io_cp" style="margin-top:10px">Importar como cópia</div>`
+    : `<div class="sub" style="margin:10px 4px">Será <b>somada</b> aos dados deste aparelho — nada é apagado.</div><div class="btn pri" id="io_new">Importar</div>`}
+    <div class="btn" id="io_cn" style="margin-top:10px">Cancelar</div>`, s => {
+    let busy = false;
+    const run = async mode => {
+      if (busy) return;
+      if (mode === 'replace' && !await confirmBox(`Apagar "${exists.nome}" (alvos e fotos) deste aparelho e pôr a recebida no lugar?`, 'Substituir', true)) return importOpPreview(pkg);
+      busy = true; toast('Importando e recriptografando…');
+      try { const r = await mergeOpPackage(pkg, mode); closeSheet(); location.hash = '#op/' + r.op.id; route();
+        toast(`✔ ${mode === 'replace' ? 'Operação substituída' : mode === 'copy' ? 'Cópia importada' : 'Operação importada'}: ${r.nAlvos} alvo(s), ${r.nFotos} foto(s)${r.miss ? ` · ${r.miss} foto(s) ausente(s) no arquivo` : ''}`, 3500); }
+      catch (e) { console.error(e); busy = false; toast('Erro: ' + e.message); }
+    };
+    s.querySelector('#io_cn').onclick = closeSheet;
+    if (exists) { s.querySelector('#io_rep').onclick = () => run('replace'); s.querySelector('#io_cp').onclick = () => run('copy'); }
+    else s.querySelector('#io_new').onclick = () => run('new');
+  });
 }
 
 /* ---------- Início ---------- */
