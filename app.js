@@ -84,6 +84,15 @@ function geo() {
   });
 }
 const coord = l => l ? `${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}` : '—';
+const accTxt = l => l && l.acc != null ? ` (±${l.acc} m)` : '';
+const isAlbum = f => f && f.origem === 'album';
+/* Capa do alvo: a.capa se a foto ainda existir; senão a última (hero) ou a primeira (miniatura) */
+function capaId(a, fallback = 'last') {
+  const fs = a.fotos || []; if (!fs.length) return '';
+  if (a.capa && fs.some(f => f.id === a.capa)) return a.capa;
+  return (fallback === 'first' ? fs[0] : fs[fs.length - 1]).id;
+}
+const fotosCapaPrimeiro = a => { const fs = a.fotos || []; const c = a.capa && fs.find(f => f.id === a.capa); return c ? [c, ...fs.filter(f => f !== c)] : fs.slice(); };
 
 /* ---------- Roteador ---------- */
 addEventListener('hashchange', route);
@@ -199,7 +208,7 @@ async function viewOp(id) {
   <div class="top"><div><h1>${esc(op.nome)}</h1><div style="margin-top:6px"><span class="chip ${st[0]}">${st[1]}</span></div></div><div class="btn sm" id="ed">Editar</div></div>
   ${op.desc ? `<div class="card glass" style="cursor:default"><div class="sub">${esc(op.desc)}</div></div>` : ''}
   <h2>Alvos (${alvos.length})</h2>
-  ${alvos.length ? alvos.map(a => { const p = PRIO[a.prio] || PRIO.media; return `<div class="card glass" onclick="location.hash='#alvo/${a.id}'"><div class="row"><div style="display:flex;gap:12px;align-items:center"><div class="th" style="width:48px;height:48px;flex-shrink:0" data-img="${a.fotos?.[0]?.id || ''}">${a.fotos?.length ? '' : '<div style="display:flex;height:100%;align-items:center;justify-content:center">👤</div>'}</div><div><div class="t">${esc(a.nome)}</div><div class="sub">${esc(a.apelido ? '“' + a.apelido + '”' : '')} ${a.fotos?.length || 0} foto(s) · ${a.locais?.length || 0} local(is)</div></div></div><span class="chip ${p[0]}">${p[1].replace('Prioridade ', '')}</span></div></div>`; }).join('')
+  ${alvos.length ? alvos.map(a => { const p = PRIO[a.prio] || PRIO.media; return `<div class="card glass" onclick="location.hash='#alvo/${a.id}'"><div class="row"><div style="display:flex;gap:12px;align-items:center"><div class="th" style="width:48px;height:48px;flex-shrink:0" data-img="${capaId(a, 'first')}">${a.fotos?.length ? '' : '<div style="display:flex;height:100%;align-items:center;justify-content:center">👤</div>'}</div><div><div class="t">${esc(a.nome)}</div><div class="sub">${esc(a.apelido ? '“' + a.apelido + '”' : '')} ${a.fotos?.length || 0} foto(s) · ${a.locais?.length || 0} local(is)</div></div></div><span class="chip ${p[0]}">${p[1].replace('Prioridade ', '')}</span></div></div>`; }).join('')
   : `<div class="empty"><div>👤</div>Nenhum alvo nesta operação.</div>`}
   <div class="btn" id="imp_op" style="margin-top:14px">⬆️ Importar alvos em lote</div>
   <div class="btn" id="exp_op" style="margin-top:10px">📦 Exportar operação (outro aparelho)</div>
@@ -245,7 +254,7 @@ function viewAlvoForm(id, opId) {
 /* ---------- Ficha do alvo ---------- */
 function timeline(a) {
   const ev = [...(a.log || []).map(x => ({ts: x.ts, i: '📝', t: x.t}))];
-  (a.fotos || []).forEach(f => ev.push({ts: f.ts, i: '📷', t: 'Foto' + (f.legenda ? ': ' + f.legenda : '') + (f.lat ? ` · ${coord(f)}` : ' · sem GPS')}));
+  (a.fotos || []).forEach(f => ev.push({ts: f.ts, i: isAlbum(f) ? '🖼️' : '📷', t: 'Foto' + (isAlbum(f) ? ' (álbum)' : '') + (f.legenda ? ': ' + f.legenda : '') + (f.lat ? ` · ${coord(f)}` : ' · sem GPS')}));
   (a.locais || []).forEach(l => ev.push({ts: l.ts, i: (TIPOS[l.tipo] || TIPOS.outro)[0], t: `${l.titulo || (TIPOS[l.tipo] || TIPOS.outro)[1]} · ${coord(l)}` + (l.nota ? ' — ' + l.nota : '')}));
   (a.notas || []).forEach(n => ev.push({ts: n.ts, i: '🗒️', t: n.txt}));
   return ev.sort((x, y) => y.ts - x.ts);
@@ -257,17 +266,17 @@ async function viewAlvo(id) {
   const tl = timeline(a);
   APP.innerHTML = `<div class="back" onclick="location.hash='#op/${a.opId}'">‹ ${esc(op?.nome || 'Operação')}</div>
   <div class="hero" id="hero">${a.fotos?.length ? '' : '<div class="ph">👤</div>'}<div class="cap glass"><div class="row"><div><div class="t" style="font-weight:700;font-size:18px">${esc(a.nome)}</div><div class="sub">${a.fotos?.length || 0} foto(s) · ${a.locais?.length || 0} local(is) · ${a.notas?.length || 0} nota(s)</div></div><span class="chip ${p[0]}">${p[1].replace('Prioridade ', '')}</span></div></div></div>
-  <div class="acts"><div class="act glass" id="b_foto"><em>📷</em>Fotografar</div><div class="act glass" id="b_loc"><em>📍</em>Marcar local</div><div class="act glass" id="b_nota"><em>🗒️</em>Anotar</div><div class="act glass" onclick="location.hash='#mapa/${a.id}'"><em>🗺️</em>Mapa</div></div>
+  <div class="acts"><div class="act glass" id="b_foto"><em>📷</em>Foto</div><div class="act glass" id="b_loc"><em>📍</em>Marcar local</div><div class="act glass" id="b_nota"><em>🗒️</em>Anotar</div><div class="act glass" onclick="location.hash='#mapa/${a.id}'"><em>🗺️</em>Mapa</div></div>
   <div class="card glass list" style="cursor:default;padding:0">${rows.length ? rows.map(r => `<div class="li"><span>${r[0]}</span><b>${r[0] === 'Telefones' ? r[1].split('<br>').map(esc).join('<br>') : esc(r[1])}</b></div>`).join('') : '<div class="li"><span>Sem dados cadastrados</span></div>'}</div>
   <h2>Fotos</h2>
-  ${a.fotos?.length ? `<div class="thumbs">${a.fotos.map(f => `<div class="th" data-img="${f.id}" data-g="${f.lat ? '📍' : ''}" onclick="viewer('${a.id}','${f.id}')"></div>`).join('')}</div>` : '<div class="sub" style="margin:0 4px">Nenhuma foto. Use “Fotografar”.</div>'}
+  ${a.fotos?.length ? `<div class="thumbs">${a.fotos.map(f => `<div class="th" data-img="${f.id}" data-g="${(a.capa === f.id ? '⭐' : '') + (f.lat ? '📍' : '')}" onclick="viewer('${a.id}','${f.id}')"></div>`).join('')}</div>` : '<div class="sub" style="margin:0 4px">Nenhuma foto. Use “Foto”.</div>'}
   <h2>Linha do tempo</h2>
   ${tl.length ? `<div class="tl">${tl.map(e => `<div class="tli glass"><div class="sub">${fmt(e.ts)}</div><div style="margin-top:3px">${e.i} ${esc(e.t)}</div></div>`).join('')}</div>` : ''}
   <div class="gap"></div><div class="btn pri" onclick="location.hash='#exportar/${a.id}'">📤 Exportar / compartilhar</div>
   <div class="grid2" style="margin-top:10px"><div class="btn" onclick="location.hash='#alvo/${a.id}/editar'">✏️ Editar</div><div class="btn dan" id="b_del">🗑️ Excluir</div></div>`;
-  if (a.fotos?.length) getImg(a.fotos[a.fotos.length - 1].id).then(u => { if (u && $('#hero')) $('#hero').insertAdjacentHTML('afterbegin', `<img src="${u}">`); });
+  if (a.fotos?.length) getImg(capaId(a, 'last')).then(u => { if (u && $('#hero')) $('#hero').insertAdjacentHTML('afterbegin', `<img src="${u}">`); });
   loadThumbs();
-  $('#b_foto').onclick = () => takePhoto(a);
+  $('#b_foto').onclick = () => photoMenu(a);
   $('#b_loc').onclick = () => markPlace(a);
   $('#b_nota').onclick = () => sheet(`<h2 style="margin-top:0">Nova anotação</h2><textarea id="n_t" placeholder="O que foi observado, horário, com quem…" style="min-height:130px"></textarea><div class="gap"></div><div class="btn pri" id="n_ok">Salvar anotação</div>`, s => {
     s.querySelector('#n_t').focus();
@@ -281,13 +290,23 @@ async function viewAlvo(id) {
 }
 async function viewer(aid, fid) {
   const a = getAlvo(aid); const f = a.fotos.find(x => x.id === fid); const u = await getImg(fid);
+  const alb = isAlbum(f); const ehCapa = a.capa === fid;
+  const quando = alb
+    ? `🕒 Data original da foto: ${f.dataExif === false ? '<span class="sub">sem data na foto</span>' : fmt(f.ts)}<br>⬇️ Importada em: ${fmt(f.importado || f.ts)}`
+    : `🕒 ${fmt(f.ts)}`;
+  const onde = f.lat != null ? `📍 ${coord(f)}${accTxt(f)}${alb ? ' <span class="sub">(GPS da foto)</span>' : ''}` : `📍 ${alb ? 'sem localização na foto' : 'sem localização'}`;
   const d = document.createElement('div'); d.className = 'viewer';
   d.innerHTML = `<img src="${u}"><div class="glass" style="margin-top:14px;padding:12px 16px;max-width:100%;font-size:13px;line-height:1.6">
-    ${f.legenda ? `<b>${esc(f.legenda)}</b><br>` : ''}🕒 ${fmt(f.ts)}<br>📍 ${f.lat ? coord(f) + ` (±${f.acc} m)` : 'sem localização'}<br><span class="sub">SHA-256: ${f.hash.slice(0, 32)}…</span></div>
-    <div class="grid2" style="margin-top:14px;width:100%;max-width:420px"><div class="btn dan" id="v_del">Excluir foto</div><div class="btn" id="v_x">Fechar</div></div>`;
+    ${f.legenda ? `<b>${esc(f.legenda)}</b><br>` : ''}<span id="v_org">${alb ? '🖼️ Origem: Álbum' : '📷 Origem: Câmera'}</span><br>${quando}<br>${onde}<br><span class="sub">SHA-256${f.hashTipo === 'original' ? ' (arquivo original)' : ''}: ${f.hash.slice(0, 32)}…</span></div>
+    <div class="btn ${ehCapa ? '' : 'pri'}" id="v_capa" style="margin-top:14px;width:100%;max-width:420px">${ehCapa ? '⭐ Capa atual' : '⭐ Usar como capa'}</div>
+    <div class="grid2" style="margin-top:10px;width:100%;max-width:420px"><div class="btn dan" id="v_del">Excluir foto</div><div class="btn" id="v_x">Fechar</div></div>`;
   document.body.appendChild(d);
   d.querySelector('#v_x').onclick = () => d.remove();
-  d.querySelector('#v_del').onclick = async () => { if (!await confirmBox('Excluir esta foto?', 'Excluir', true)) return; a.fotos = a.fotos.filter(x => x.id !== fid); await DB.del('img:' + fid); await save(); d.remove(); route(); };
+  d.querySelector('#v_capa').onclick = async () => {
+    if (a.capa === fid) return toast('Esta já é a capa');
+    a.capa = fid; a.log = a.log || []; a.log.push({ts: Date.now(), t: 'Capa alterada'}); await save(); d.remove(); route(); toast('⭐ Capa definida');
+  };
+  d.querySelector('#v_del').onclick = async () => { d.style.display = 'none'; /* o visualizador fica acima da folha de confirmação */ if (!await confirmBox('Excluir esta foto?', 'Excluir', true)) { d.style.display = ''; return; } a.fotos = a.fotos.filter(x => x.id !== fid); if (a.capa === fid) delete a.capa; await DB.del('img:' + fid); await save(); d.remove(); route(); };
 }
 
 /* ---------- Foto com GPS ---------- */
@@ -298,9 +317,21 @@ function resizeJpeg(file, max = 1600) {
     img.onerror = () => rej(new Error('imagem inválida')); img.src = u;
   });
 }
+/* Menu “Foto”: câmera ou álbum */
+function photoMenu(a) {
+  sheet(`<h2 style="margin-top:0">Adicionar foto</h2>
+    <div class="btn pri" id="pm_cam">📷 Tirar foto</div>
+    <div class="btn" id="pm_alb" style="margin-top:10px">🖼️ Escolher do álbum</div>
+    <div class="sub" style="margin:10px 4px 0;line-height:1.4">Do álbum, a data e o local vêm da própria foto (se ela tiver). O GPS atual não é usado.</div>`, s => {
+    // o clique no input acontece dentro do mesmo toque (exigência do iPhone)
+    s.querySelector('#pm_cam').onclick = () => { closeSheet(); takePhoto(a); };
+    s.querySelector('#pm_alb').onclick = () => { closeSheet(); pickAlbum(a); };
+  });
+}
 function takePhoto(a) {
   const inp = $('#cam'); inp.value = ''; hold(180000);
   const gp = geo(); // GPS começa junto com a câmera
+  inp.oncancel = () => release();
   inp.onchange = async () => {
     release(); const file = inp.files[0]; if (!file) return;
     toast('Processando e criptografando…');
@@ -308,12 +339,121 @@ function takePhoto(a) {
       const bytes = await resizeJpeg(file); const hash = await sha256(bytes); const pos = await gp;
       const fid = uid(); await putImg(fid, new Uint8Array(bytes));
       sheet(`<h2 style="margin-top:0">Foto salva no cofre</h2><div class="sub">${pos ? `📍 ${coord(pos)} (±${pos.acc} m)` : '⚠️ Sem localização (GPS negado ou indisponível)'}</div><label>Legenda (opcional)</label><input id="p_l" placeholder="Ex.: entrada da residência"><div class="gap"></div><div class="btn pri" id="p_ok">Concluir</div>`, s => {
-        const done = async () => { a.fotos = a.fotos || []; a.fotos.push({id: fid, ts: Date.now(), hash, legenda: s.querySelector('#p_l')?.value.trim() || '', ...(pos || {})}); if (pos) { a.locais = a.locais || []; } await save(); closeSheet(); route(); toast('📷 Foto registrada'); };
+        const done = async () => { a.fotos = a.fotos || []; a.fotos.push({id: fid, ts: Date.now(), hash, legenda: s.querySelector('#p_l')?.value.trim() || '', origem: 'camera', ...(pos || {})}); await save(); closeSheet(); route(); toast('📷 Foto registrada'); };
         s.querySelector('#p_ok').onclick = done;
       });
     } catch (e) { toast('Erro: ' + e.message); }
   };
   inp.click();
+}
+
+/* ---------- Leitor EXIF mínimo (JPEG) — by @aiforge.team ---------- */
+// Lê GPS, DateTimeOriginal e Orientation dos bytes originais. Não-JPEG ou EXIF ausente/corrompido → {}.
+function parseExif(buf) {
+  try {
+    const v = new DataView(buf instanceof ArrayBuffer ? buf : buf.buffer, buf.byteOffset || 0, buf.byteLength);
+    if (v.byteLength < 4 || v.getUint16(0) !== 0xFFD8) return {};
+    let p = 2;
+    while (p + 4 <= v.byteLength) {
+      if (v.getUint8(p) !== 0xFF) return {};
+      const mk = v.getUint8(p + 1);
+      if (mk === 0xFF) { p++; continue; }               // preenchimento
+      if (mk === 0xDA || mk === 0xD9) return {};          // início da imagem: sem EXIF
+      if (mk === 0x01 || (mk >= 0xD0 && mk <= 0xD7)) { p += 2; continue; }
+      const len = v.getUint16(p + 2);
+      if (len < 2 || p + 2 + len > v.byteLength) return {};
+      if (mk === 0xE1 && len >= 16 && v.getUint32(p + 4) === 0x45786966 && v.getUint16(p + 8) === 0) return readTiff(v, p + 10, p + 2 + len);
+      p += 2 + len;
+    }
+  } catch (e) { /* EXIF inválido: ignora */ }
+  return {};
+}
+function readTiff(v, t, end) {
+  const bo = v.getUint16(t); if (bo !== 0x4949 && bo !== 0x4D4D) return {};
+  const le = bo === 0x4949;
+  const u16 = o => v.getUint16(o, le), u32 = o => v.getUint32(o, le);
+  if (u16(t + 2) !== 42) return {};
+  const SZ = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8};
+  const ifd = off => {
+    const out = {}; const base = t + off;
+    if (off < 8 || base + 2 > end) return out;
+    const n = u16(base); if (n > 512 || base + 2 + n * 12 > end) return out;
+    for (let i = 0; i < n; i++) {
+      const e = base + 2 + i * 12, tag = u16(e), type = u16(e + 2), cnt = u32(e + 4), sz = SZ[type];
+      if (!sz || cnt > 65535) continue;
+      const vo = sz * cnt <= 4 ? e + 8 : t + u32(e + 8);
+      if (vo + sz * cnt > end) continue;
+      let val;
+      if (type === 2) { let str = ''; for (let k = 0; k < cnt; k++) { const c = v.getUint8(vo + k); if (!c) break; str += String.fromCharCode(c); } val = str; }
+      else if (type === 3) val = cnt === 1 ? u16(vo) : Array.from({length: cnt}, (_, k) => u16(vo + 2 * k));
+      else if (type === 4) val = cnt === 1 ? u32(vo) : Array.from({length: cnt}, (_, k) => u32(vo + 4 * k));
+      else if (type === 5 || type === 10) { val = []; for (let k = 0; k < cnt; k++) { const nu = type === 5 ? u32(vo + 8 * k) : v.getInt32(vo + 8 * k, le), de = type === 5 ? u32(vo + 8 * k + 4) : v.getInt32(vo + 8 * k + 4, le); val.push(de ? nu / de : NaN); } }
+      else continue;
+      out[tag] = val;
+    }
+    return out;
+  };
+  const i0 = ifd(u32(t + 4)); const r = {};
+  if (i0[0x0112]) r.orientation = i0[0x0112];
+  const ex = i0[0x8769] ? ifd(i0[0x8769]) : {};
+  const dto = ex[0x9003] || ex[0x9004] || i0[0x0132];
+  const m = typeof dto === 'string' && dto.match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (m && +m[1] > 1900) {
+    const off = typeof ex[0x9011] === 'string' && /^[+-]\d{2}:\d{2}$/.test(ex[0x9011]) ? ex[0x9011] : null;
+    const ts = off ? Date.parse(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}${off}`) : new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime();
+    if (isFinite(ts)) r.ts = ts;
+  }
+  if (i0[0x8825]) {
+    const g = ifd(i0[0x8825]);
+    const dms = a => Array.isArray(a) && a.length >= 3 ? a[0] + a[1] / 60 + a[2] / 3600 : NaN;
+    let lat = dms(g[2]), lng = dms(g[4]);
+    if (/S/i.test(g[1] || '')) lat = -lat; if (/W/i.test(g[3] || '')) lng = -lng;
+    if (validLatLng(lat, lng) && !(lat === 0 && lng === 0)) { r.lat = +lat.toFixed(7); r.lng = +lng.toFixed(7); }
+  }
+  return r;
+}
+
+/* ---------- Fotos do álbum (várias de uma vez) ---------- */
+function pickAlbum(a) {
+  const inp = $('#alb'); inp.value = ''; hold(300000);
+  inp.oncancel = () => release();
+  inp.onchange = () => { release(); const files = [...(inp.files || [])]; inp.value = ''; if (files.length) importAlbum(a, files); };
+  inp.click();
+}
+async function importAlbum(a, files) {
+  const added = []; let falhas = 0; const n = files.length;
+  for (let i = 0; i < n; i++) {
+    if (!KEY) return; // cofre travou no meio
+    resetIdle(); toast(`🖼️ Processando ${i + 1}/${n}…`, 60000);
+    try {
+      const file = files[i]; const orig = await file.arrayBuffer();
+      const ex = parseExif(orig);                     // EXIF antes de redimensionar (o canvas remove os metadados)
+      const hash = await sha256(orig);                // hash dos bytes ORIGINAIS do arquivo
+      const bytes = await resizeJpeg(file);           // o navegador já aplica a rotação do EXIF ao desenhar
+      const fid = uid(); await putImg(fid, new Uint8Array(bytes)); const now = Date.now();
+      const f = {id: fid, ts: ex.ts || now, importado: now, dataExif: !!ex.ts, hash, hashTipo: 'original', legenda: '', origem: 'album', arquivo: file.name || ''};
+      if (ex.lat != null) Object.assign(f, {lat: ex.lat, lng: ex.lng, acc: null});
+      if (ex.orientation) f.orient = ex.orientation;
+      a.fotos = a.fotos || []; a.fotos.push(f); added.push(f);
+    } catch (e) { console.warn('álbum: falha', e); falhas++; }
+  }
+  if (added.length) await save();
+  $('#toast').classList.add('hidden');
+  const comGps = added.filter(f => f.lat != null).length;
+  if (!added.length) { route(); return toast('⚠️ Nenhuma foto pôde ser processada'); }
+  sheet(`<h2 style="margin-top:0">Fotos do álbum</h2>
+    <div class="card glass" style="cursor:default" id="al_sum"><div class="t">${added.length} foto(s) adicionada(s), ${comGps} com localização</div>
+      ${falhas ? `<div class="sub" style="margin-top:4px">⚠️ ${falhas} arquivo(s) não puderam ser lidos</div>` : ''}
+      ${comGps < added.length ? `<div class="sub" style="margin-top:4px">Sem local na foto? No iPhone, ative <b>Opções → Localização</b> ao escolher.</div>` : ''}</div>
+    <label>Legenda comum (opcional, aplicada a todas)</label><input id="al_l" placeholder="Ex.: fotos da campana">
+    <div class="gap"></div><div class="btn pri" id="al_ok">Concluir</div>`, s => {
+    s.querySelector('#al_ok').onclick = async () => {
+      const lg = s.querySelector('#al_l').value.trim();
+      if (lg) { added.forEach(f => f.legenda = lg); await save(); }
+      closeSheet(); route(); toast(`🖼️ ${added.length} foto(s) registrada(s)`);
+    };
+  });
+  route();
 }
 
 /* ---------- Marcar local ---------- */
@@ -424,7 +564,7 @@ function exportData(a, o) {
   const tel = t => o.mask ? maskTel(t) : t, doc = t => o.mask ? maskDoc(t) : t;
   const dados = [['Nome', a.nome], ['Vulgo', a.apelido], ['Documento', a.doc && doc(a.doc)], ['Telefones', (a.tels || []).map(tel).join(', ')], ['Veículo', a.veic], ['Endereço', a.end], ['Vínculos', a.vinc], ['Prioridade', (PRIO[a.prio] || PRIO.media)[1].replace('Prioridade ', '')], ['Operação', getOp(a.opId)?.nome]].filter(r => r[1]);
   const locais = [...(a.locais || []).map(l => ({t: `${(TIPOS[l.tipo] || TIPOS.outro)[1]}${l.titulo ? ' — ' + l.titulo : ''}`, c: coord(l), n: l.nota, ts: l.ts, url: `https://maps.google.com/?q=${l.lat},${l.lng}`})),
-    ...(a.fotos || []).filter(f => f.lat).map(f => ({t: 'Foto' + (f.legenda ? ' — ' + f.legenda : ''), c: coord(f), ts: f.ts, url: `https://maps.google.com/?q=${f.lat},${f.lng}`}))].sort((x, y) => x.ts - y.ts);
+    ...(a.fotos || []).filter(f => f.lat).map(f => ({t: 'Foto' + (isAlbum(f) ? ' (álbum)' : '') + (f.legenda ? ' — ' + f.legenda : ''), c: coord(f), ts: f.ts, url: `https://maps.google.com/?q=${f.lat},${f.lng}`}))].sort((x, y) => x.ts - y.ts);
   return {dados, locais};
 }
 const fileStamp = () => { const d = new Date(), z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}`; };
@@ -443,10 +583,14 @@ async function buildPDF(a, o, pw) {
   pdf.setFontSize(9); pdf.setTextColor(100, 110, 125); pdf.text(`Gerado em ${fmt(Date.now())}${o.mask ? ' · dados sensíveis mascarados' : ''}`, M, y); y += 8; pdf.setTextColor(20, 24, 32);
   if (o.dados) { title('Dados do alvo'); dados.forEach(([k, v]) => { need(6); pdf.setFont(undefined, 'bold'); pdf.text(k + ':', M, y); pdf.setFont(undefined, 'normal'); const L_ = pdf.splitTextToSize(String(v), W - 2 * M - 32); L_.forEach((l, i) => { if (i) need(5); pdf.text(l, M + 32, y); y += 5; }); y += 1; }); y += 3; }
   if (o.fotos && a.fotos?.length) { title(`Fotos (${a.fotos.length})`);
-    for (const f of a.fotos) { const du = await imgDataURL(f.id); if (!du) continue; const p = pdf.getImageProperties(du); const w = 90, h = Math.min(100, w * p.height / p.width); need(h + 16);
+    for (const f of fotosCapaPrimeiro(a)) { const du = await imgDataURL(f.id); if (!du) continue; const p = pdf.getImageProperties(du); const w = 90, h = Math.min(100, w * p.height / p.width);
+      const alb = isAlbum(f);
+      const lines = [(a.capa === f.id ? '[Capa] ' : '') + (f.legenda || 'Foto') + (alb ? ' (álbum)' : ''), alb ? `Data da foto: ${f.dataExif === false ? 'sem data na foto' : fmt(f.ts)}` : fmt(f.ts), ...(alb ? [`Importada em ${fmt(f.importado || f.ts)}`] : []),
+        f.lat != null ? `GPS: ${coord(f)}${accTxt(f)}${alb ? ' (da foto)' : ''}` : (alb ? 'Sem localização na foto' : 'Sem GPS'), alb && f.hashTipo === 'original' ? 'SHA-256 (arquivo original):' : 'SHA-256:', f.hash.slice(0, 32), f.hash.slice(32)];
+      const bh = Math.max(h, lines.length * 5); need(bh + 8);
       pdf.addImage(du, 'JPEG', M, y, h === 100 ? 100 * p.width / p.height : w, h); pdf.setFontSize(9);
-      const tx = M + 96; let ty = y + 4; [f.legenda || 'Foto', fmt(f.ts), f.lat ? `GPS: ${coord(f)} (±${f.acc} m)` : 'Sem GPS', 'SHA-256:', f.hash.slice(0, 32), f.hash.slice(32)].forEach(t => { pdf.text(pdf.splitTextToSize(t, W - M - tx)[0], tx, ty); ty += 5; });
-      pdf.setFontSize(10); y += h + 6; } }
+      const tx = M + 96; let ty = y + 4; lines.forEach(t => { pdf.text(pdf.splitTextToSize(t, W - M - tx)[0], tx, ty); ty += 5; });
+      pdf.setFontSize(10); y += bh + 6; } }
   if (o.locais && locais.length) { title('Locais'); locais.forEach(l => { need(12); pdf.setFont(undefined, 'bold'); pdf.text(l.t, M, y); pdf.setFont(undefined, 'normal'); y += 5; pdf.setTextColor(45, 95, 214); pdf.textWithLink(`${l.c}  ·  ${fmt(l.ts)}  ·  abrir no mapa`, M + 4, y, {url: l.url}); pdf.setTextColor(20, 24, 32); y += 5; if (l.n) para(l.n, 4); y += 2; }); }
   if (o.notas && a.notas?.length) { title('Anotações'); a.notas.slice().sort((x, z) => x.ts - z.ts).forEach(n => { need(10); pdf.setFontSize(8.5); pdf.setTextColor(100, 110, 125); pdf.text(fmt(n.ts), M, y); y += 4.5; pdf.setFontSize(10); pdf.setTextColor(20, 24, 32); para(n.txt); y += 2; }); }
   if (o.tl) { title('Linha do tempo'); timeline(a).reverse().forEach(e => para(`${fmt(e.ts)} — ${e.t}`)); }
@@ -467,10 +611,10 @@ async function buildImage(a, o) {
   const sec = t => { y += 24; F(30, 700); g.fillStyle = '#9cbcff'; g.fillText(t, P, y); y += 14; g.fillStyle = 'rgba(91,143,255,.4)'; g.fillRect(P, y, W - 2 * P, 2); y += 40; };
   if (o.dados) { sec('Dados'); dados.forEach(([k, v]) => { F(26, 600); g.fillStyle = '#8a9bb8'; g.fillText(k, P, y); F(28); g.fillStyle = '#e6ecf5'; wrap(v, P + 220, W - 2 * P - 220, 38); y += 4; }); }
   if (o.fotos && a.fotos?.length) { sec('Fotos'); const cols = 2, gw = (W - 2 * P - 20) / cols; let i = 0;
-    for (const f of a.fotos.slice(0, 8)) { const du = await imgDataURL(f.id); const im = await new Promise(r => { const x = new Image(); x.onload = () => r(x); x.src = du; });
+    for (const f of fotosCapaPrimeiro(a).slice(0, 8)) { const du = await imgDataURL(f.id); const im = await new Promise(r => { const x = new Image(); x.onload = () => r(x); x.src = du; });
       const x = P + (i % cols) * (gw + 20), h = gw * .75; const r = Math.max(gw / im.width, h / im.height); const sw = gw / r, sh = h / r;
       g.save(); g.beginPath(); g.roundRect ? g.roundRect(x, y, gw, h, 18) : g.rect(x, y, gw, h); g.clip(); g.drawImage(im, (im.width - sw) / 2, (im.height - sh) / 2, sw, sh, x, y, gw, h); g.restore();
-      F(20); g.fillStyle = '#aab6c9'; g.fillText(`${fmt(f.ts)}${f.lat ? ' · ' + coord(f) : ''}`.slice(0, 44), x, y + h + 28);
+      F(20); g.fillStyle = '#aab6c9'; g.fillText(`${a.capa === f.id ? '⭐ ' : ''}${fmt(f.ts)}${isAlbum(f) ? ' (álbum)' : ''}${f.lat ? ' · ' + coord(f) : ''}`.slice(0, 50), x, y + h + 28);
       if (i % cols === cols - 1 || i === Math.min(a.fotos.length, 8) - 1) y += h + 56; i++; } }
   if (o.locais && locais.length) { sec('Locais'); locais.forEach(l => { F(28, 600); g.fillStyle = '#e6ecf5'; wrap(l.t, P, W - 2 * P, 36); F(24); g.fillStyle = '#7fa4e6'; g.fillText(`📍 ${l.c}  ·  ${fmt(l.ts)}`, P, y); y += 36; if (l.n) { g.fillStyle = '#aab6c9'; wrap(l.n, P, W - 2 * P, 32); } y += 8; }); }
   if (o.notas && a.notas?.length) { sec('Anotações'); a.notas.slice().sort((x, z) => x.ts - z.ts).forEach(n => { F(22); g.fillStyle = '#8a9bb8'; g.fillText(fmt(n.ts), P, y); y += 32; F(26); g.fillStyle = '#e6ecf5'; wrap(n.txt, P, W - 2 * P, 34); y += 10; }); }
@@ -504,7 +648,7 @@ async function viewCofre() {
     <div class="tgrow" id="imp_lote" style="cursor:pointer"><div>Importar em lote<div class="sub">colar lista ou arquivo .txt/.csv (campos separados por |)</div></div><span>⬆️</span></div>
     <div class="tgrow" id="imp_opv" style="cursor:pointer"><div>Importar operação<div class="sub">arquivo .opsvault vindo de outro aparelho — junta com os dados atuais</div></div><span>📦</span></div></div>
   <h2>Zona de perigo</h2><div class="btn dan" id="wipe">Apagar tudo deste aparelho</div>
-  <h2>Sobre</h2><div class="card glass" style="cursor:default"><div class="t">${esc(APP_NAME)}</div><div class="sub" style="margin-top:4px">Protótipo v0.3.1 · dados só no aparelho, sem servidor</div><div class="credit" style="text-align:left;margin-top:10px">Criado <b>${esc(CREDIT)}</b></div></div>`;
+  <h2>Sobre</h2><div class="card glass" style="cursor:default"><div class="t">${esc(APP_NAME)}</div><div class="sub" style="margin-top:4px">Protótipo v0.4 · dados só no aparelho, sem servidor</div><div class="credit" style="text-align:left;margin-top:10px">Criado <b>${esc(CREDIT)}</b></div></div>`;
   $('#imp_lote').onclick = () => importBatch();
   $('#imp_opv').onclick = () => importOpUI();
   $('#idle').onchange = async e => { S.cfg.idle = +e.target.value; await save(); resetIdle(); toast('Trava automática: ' + S.cfg.idle + ' min'); };
@@ -541,7 +685,7 @@ function viewAjuda() {
     ['📲 Instalar na tela inicial', `<ul><li><b>Android (Chrome):</b> menu ⋮ → <b>Adicionar à tela inicial</b> / <b>Instalar app</b>.</li><li><b>iPhone (Safari):</b> botão Compartilhar ⬆️ → <b>Adicionar à Tela de Início</b>.</li></ul>Depois disso, ele abre em tela cheia como um app comum e funciona sem internet (exceto o fundo do mapa).`],
     ['🗂️ Operações', `<ol><li>Na aba <b>Operações</b>, toque em <b>+</b>.</li><li>Dê um nome, escolha o status (Planejada, Em andamento, Encerrada) e descreva o objetivo.</li><li>Toque na operação para ver e adicionar alvos. Use <b>Editar</b> para mudar o status.</li></ol>`],
     ['👤 Alvos', `<ol><li>Dentro da operação, toque em <b>+</b>.</li><li>Preencha o que souber: nome, vulgo, documento, telefones (um por linha), veículo, endereço, vínculos e prioridade.</li><li>A ficha do alvo reúne dados, fotos, locais, anotações e linha do tempo.</li></ol>`],
-    ['📷 Fotos com GPS', `<ol><li>Na ficha, toque em <b>Fotografar</b>. A câmera abre e o GPS é lido ao mesmo tempo.</li><li>Na primeira vez, <b>permita câmera e localização</b>.</li><li>A foto vai direto para o cofre, criptografada, com data/hora, coordenadas e um <b>código SHA-256</b> (prova de que não foi alterada).</li><li>A foto <b>não</b> é salva na galeria do celular.</li><li>Toque numa miniatura para ver detalhes ou excluir.</li></ol>`],
+    ['📷 Fotos (câmera ou álbum)', `<p>Na ficha, toque em <b>Foto</b> e escolha:</p><ul><li><b>📷 Tirar foto</b> — a câmera abre e o GPS do aparelho é lido ao mesmo tempo. Na primeira vez, <b>permita câmera e localização</b>. A foto vai direto para o cofre e <b>não</b> é salva na galeria.</li><li><b>🖼️ Escolher do álbum</b> — selecione <b>uma ou várias</b> fotos já existentes. A <b>data original</b> e a <b>localização</b> são lidas da própria foto (EXIF); o GPS atual do aparelho <b>não</b> é usado. No fim, aparece um resumo (“N foto(s) adicionada(s), X com localização”) e você pode pôr uma legenda comum a todas.</li></ul><ul><li>Toda foto é guardada criptografada com um <b>código SHA-256</b>. Nas fotos do álbum, o código é do <b>arquivo original</b> (antes de reduzir), o que reforça a prova de integridade.</li><li>Toque numa miniatura para ver origem (Câmera/Álbum), data original × data de importação, local, ou para excluir.</li><li><b>⭐ Capa:</b> no visualizador, toque em <b>Usar como capa</b> para escolher a foto que aparece no topo da ficha e na lista da operação. Ela também vai <b>primeiro</b> no PDF/imagem exportados. Sem capa escolhida, vale a foto mais recente.</li></ul><div class="warn" style="margin-bottom:0">📍 <b>iPhone:</b> ao escolher fotos, o seletor tem o botão <b>Opções</b> no topo. Se <b>Localização</b> estiver desligada ali, o iPhone <b>remove o local</b> da foto antes de entregar ao app — ela entra “sem localização na foto”. Ligue antes de selecionar.</div>`],
     ['📍 Marcar locais', `<ol><li>Na ficha, toque em <b>Marcar local</b>.</li><li>Escolha o tipo (🏠 residência, 🏢 trabalho, 🚗 veículo, 🤝 ponto de encontro, 📍 outro), um título e uma observação.</li><li><b>Estou aqui</b> usa o GPS; <b>Escolher no mapa</b> deixa você tocar no ponto. Arraste o marcador para ajustar.</li></ol>`],
     ['🗺️ Mapa', `<ul><li>A aba <b>Mapa</b> mostra todos os pontos de todos os alvos, com cores por tipo.</li><li>Na ficha, o botão <b>Mapa</b> mostra só aquele alvo.</li><li>Toque num marcador para abrir a ficha ou traçar <b>Rota</b> no Google Maps.</li><li>O fundo do mapa precisa de internet; os pontos ficam no aparelho.</li></ul>`],
     ['🔎 Busca no mapa', `<p>No topo do mapa (em <b>Marcar local</b> e na aba <b>Mapa</b>) há um campo de busca que aceita:</p><ul><li><b>Coordenadas:</b> <span class="kbd">-3.7319, -38.5267</span>, <span class="kbd">-3.7319 -38.5267</span> ou graus/minutos/segundos (ex.: <span class="kbd">3°43'54"S 38°31'36"W</span>).</li><li><b>Links do Google Maps:</b> cole a URL completa (com <span class="kbd">@lat,lng</span>, <span class="kbd">?q=lat,lng</span>, <span class="kbd">ll=</span> ou <span class="kbd">!3d..!4d..</span>). Links curtos <span class="kbd">maps.app.goo.gl</span> não podem ser resolvidos no aparelho — abra no navegador e copie o link completo ou as coordenadas.</li><li><b>Endereços:</b> digite o endereço e toque em <b>Ir</b>. A busca mostra até 5 resultados; toque num para posicionar o marcador e centralizar o mapa.</li></ul><div class="warn" style="margin-bottom:0">Só o <b>termo pesquisado</b> é enviado ao OpenStreetMap (serviço Nominatim). Os dados do alvo <b>não</b> saem do aparelho.</div>`],
@@ -782,7 +926,7 @@ async function mergeOpPackage(pkg, mode) {
     const fotos = [];
     for (const f of a.fotos || []) {
       const data = pkg.imgs[f.id]; if (!data) { miss++; continue; }
-      if (copy || fIds.has(f.id)) f.id = uid(); fIds.add(f.id);
+      if (copy || fIds.has(f.id)) { const nid = uid(); if (a.capa === f.id) a.capa = nid; f.id = nid; } fIds.add(f.id);
       await putImg(f.id, unb64(data)); fotos.push(f); nf++;
     }
     a.fotos = fotos; a.locais = a.locais || []; a.notas = a.notas || []; a.log = a.log || [];
