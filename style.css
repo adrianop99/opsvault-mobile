@@ -58,7 +58,7 @@ textarea{min-height:90px;resize:vertical}
 .hero img{width:100%;height:100%;object-fit:cover}
 .hero .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:60px;opacity:.35}
 .hero .cap{position:absolute;left:12px;right:12px;bottom:12px;padding:10px 14px;border-radius:16px}
-.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
 .act{height:74px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:11.5px;color:#c3cfe2;cursor:pointer;border-radius:18px}
 .act em{font-style:normal;font-size:23px}
 .thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -110,3 +110,41 @@ textarea{min-height:90px;resize:vertical}
 .tgrow:last-child{border:0}
 .kbd{display:inline-block;padding:1px 7px;border-radius:6px;background:rgba(255,255,255,.08);font-size:12px}
 .dark-tiles{filter:invert(1) hue-rotate(200deg) brightness(.85) contrast(.9) saturate(.6)}
+/* v0.5 — vínculos, chips, documento */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip.rs{cursor:pointer}
+#grafo .gl{font-size:9px;fill:#9cbcff;text-anchor:middle;paint-order:stroke;stroke:#05070b;stroke-width:3px}
+#grafo .gt{font-size:10.5px;fill:#e6ecf5;text-anchor:middle;paint-order:stroke;stroke:#05070b;stroke-width:3px;font-weight:600}
+.docth{border-radius:12px}
+.mrow input,.mrow select{margin-top:0}
+/* v0.5 — mapa: ferramentas, desenho, offline */
+.mtools{display:flex;gap:8px;margin:0 0 10px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.mtools .btn{flex-shrink:0;white-space:nowrap}
+.drawbar{padding:12px 14px;border-radius:18px;margin:0 0 10px}
+.mapbox.drawing{cursor:crosshair}
+.btn.dis{opacity:.45;pointer-events:auto}
+.swatch{width:34px;height:34px;border-radius:50%;cursor:pointer;border:2px solid transparent;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
+.swatch.on{border-color:#fff}
+.prog{height:8px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden;margin:14px 0 4px}
+.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3d6fe0,#5b8fff);transition:width .2s}
+.ov-heat{position:absolute;left:0;top:0}
+input[type=range]{accent-color:#5b8fff;background:none;border:0}
+.cdot{width:24px;height:24px;border-radius:50%;background:#fff;border:4px solid #5b8fff;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.mapbox{position:relative;z-index:0} /* isola os z-index do Leaflet: folhas e avisos ficam por cima do mapa */
+/* v0.5c — gravação de áudio, lista de áudios, modo discreto, visualizador */
+.rec-ui{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 0 6px}
+.rec-dot{width:18px;height:18px;border-radius:50%;background:#55607a}
+.rec-dot.on{background:#ff4d4d;box-shadow:0 0 0 0 rgba(255,77,77,.6);animation:recp 1.2s infinite}
+@keyframes recp{0%{box-shadow:0 0 0 0 rgba(255,77,77,.6)}100%{box-shadow:0 0 0 14px rgba(255,77,77,0)}}
+.rec-time{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.aud{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;cursor:default}
+.aud .aud-pp{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:rgba(91,143,255,.22);cursor:pointer;flex-shrink:0;font-size:15px}
+.aud .aud-del{cursor:pointer;opacity:.8;padding:6px}
+.aud .grow{flex:1;min-width:0}
+.vimg{position:relative;max-width:100%;overflow:hidden;border-radius:14px}
+.vimg img{display:block}
+body.disc .th img,body.disc .hero img,body.disc .vimg img,body.disc .docth img{filter:blur(18px) saturate(.4);transition:filter .25s}
+body.disc .th.rev img,body.disc .hero.rev img,body.disc .vimg.rev img,body.disc .docth.rev img{filter:none}
+body.disc .th:not(.rev),body.disc .hero:not(.rev),body.disc .vimg:not(.rev),body.disc .docth:not(.rev){overflow:hidden}
+body.disc::after{content:"";position:fixed;inset:0;background:rgba(0,0,0,.38);pointer-events:none;z-index:2147483000}
+.acts .act{font-size:11.5px;padding-left:4px;padding-right:4px}
