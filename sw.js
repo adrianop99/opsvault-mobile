@@ -1,8 +1,8 @@
-const C = 'opsvault-v6', TILES = 'opsvault-tiles', TILE_MAX = 3000, TTL = 7 * 864e5;
+const C = 'opsvault-v7', TILES = 'opsvault-tiles', OCR = 'opsvault-ocr-t7', TILE_MAX = 3000, TTL = 7 * 864e5;
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'lib/leaflet.js', 'lib/leaflet.css', 'lib/jspdf.umd.min.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(FILES))); self.skipWaiting(); });
-// o cache de blocos do mapa (TILES) sobrevive às trocas de versão do app
-self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C && k !== TILES).map(k => caches.delete(k))))); self.clients.claim(); });
+// o cache de blocos do mapa (TILES) e o do OCR (arquivos grandes, baixados só no 1º uso) sobrevivem às trocas de versão do app
+self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C && k !== TILES && k !== OCR).map(k => caches.delete(k))))); self.clients.claim(); });
 const isTile = u => u.origin !== location.origin && /\/\d+\/\d+\/\d+(@2x)?\.(png|jpe?g|webp)$/i.test(u.pathname);
 let puts = 0;
 async function trim(c) { // limita os blocos “vistos”; os baixados (x-ov-src: dl) nunca são cortados aqui
@@ -23,10 +23,18 @@ async function tile(req) {
   try { await c.put(req.url, out.clone()); if (++puts % 50 === 0) trim(c); } catch (e) {}
   return out;
 }
+/* OCR (tesseract.js + núcleo wasm + por.traineddata): não vai no pré-cache; guarda no 1º uso e serve do cache depois */
+async function ocrFile(req) {
+  const c = await caches.open(OCR); const hit = await c.match(req.url, {ignoreSearch: true});
+  if (hit) return hit;
+  const r = await fetch(req); if (r.ok) { try { await c.put(req.url, r.clone()); } catch (e) {} }
+  return r;
+}
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const u = new URL(e.request.url);
   if (isTile(u)) return e.respondWith(tile(e.request));
   if (u.origin !== location.origin) return;
+  if (/\/lib\/(tesseract\.min\.js|tess-worker\.min\.js|tess-core\/|tessdata\/)/.test(u.pathname)) return e.respondWith(ocrFile(e.request));
   e.respondWith(caches.match(e.request, {ignoreSearch: true}).then(r => r || fetch(e.request)));
 });
