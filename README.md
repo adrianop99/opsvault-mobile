@@ -1,6 +1,6 @@
 # OpsVault Mobile
 
-Cofre de operações criptografado (PWA) — **by @aiforge.team** · versão **v0.6**
+Cofre de operações criptografado (PWA) — **by @aiforge.team** · versão **v0.7**
 
 Os dados ficam somente no aparelho, criptografados com AES-256 (chave derivada do PIN por PBKDF2). Nenhum dado é enviado a servidor. Funciona offline e pode ser instalado na tela inicial (iPhone/Safari e Android/Chrome).
 
@@ -29,12 +29,15 @@ Os dados ficam somente no aparelho, criptografados com AES-256 (chave derivada d
 - **Régua** (v0.6) para medir distâncias no mapa.
 - **Trajeto gravado** (v0.6) por GPS, com distância e duração, no mapa, no diário e no relatório.
 - **Cruzamentos de telefones e placas** (v0.6): avisa quando o mesmo telefone (8 últimos dígitos + DDD, com ou sem 9/+55/operadora) ou a mesma placa (antiga = Mercosul) aparece em alvos diferentes ou no diário de vigilância; alertas na ficha, tela Cruzamentos (com arquivadas opcionais) e seção no relatório PDF.
+- **Extrair alvos de texto, PDF e Word** (v0.7): cole um BO, relatório ou mensagem de WhatsApp, ou escolha um PDF (com texto ou digitalizado, via OCR), Word `.docx` ou `.txt`; o app encontra nomes, vulgo, CPF (com verificação), RG, nascimento, filiação, telefones, placas e endereços e monta pessoas para **conferir** (editar, mover dados, juntar, duplicados por CPF/RG/nome) antes de criar ou completar alvos. Texto de origem opcional como anotação, com SHA-256.
+- **Fotos em lote pelo nome do arquivo** (v0.7): várias fotos de uma vez, ligadas ao alvo pelo CPF/RG (`52998224725_2.jpg`, `529.982.247-25.jpg`), nome ou vulgo no nome do arquivo; tabela de conferência (trocar alvo ou não importar), data/GPS do EXIF, SHA-256 do original, capa e carimbo opcionais.
+- **Leitura de documentos em lote** (v0.7): várias fotos de RG/CNH lidas uma a uma no aparelho (OCR), com progresso e Cancelar/Continuar; cartões com nome, CPF, RG, nascimento e filiação para conferir, juntar e checar duplicados; a imagem vira a foto do documento do alvo (criptografada, com SHA-256).
 - **Segurança**: trava automática, bloqueio progressivo após erros, **modo discreto**, **PIN de pânico** (cofre falso ou apagamento) e **Face ID / biometria** via WebAuthn (PRF quando disponível; o PIN é sempre a chave-mestra).
 
 ## Arquivos
 
-`index.html`, `style.css`, `app.js`, `sw.js`, `manifest.json`, ícones e `lib/` (Leaflet 1.9.4, jsPDF, tesseract.js com `tess-core/` e `tessdata/por.traineddata` — licença em `lib/tesseract.LICENSE.md`). Sem build e sem dependências externas em tempo de execução, exceto os blocos do mapa, a busca de endereços (Nominatim) e o ditado (serviço de fala do sistema).
+`index.html`, `style.css`, `app.js`, `sw.js`, `manifest.json`, ícones e `lib/` (Leaflet 1.9.4, jsPDF, tesseract.js com `tess-core/` e `tessdata/por.traineddata` — licença em `lib/tesseract.LICENSE.md`; pdf.js 3.11 legacy em `lib/pdfjs/` — licença Apache 2.0 em `lib/pdfjs/LICENSE`; fflate em `lib/fflate.min.js` — licença MIT em `lib/fflate.LICENSE`). Sem build e sem dependências externas em tempo de execução, exceto os blocos do mapa, a busca de endereços (Nominatim) e o ditado (serviço de fala do sistema).
 
-Cache offline: `opsvault-v7` (arquivos do app, pré-carregados), `opsvault-ocr-t7` (OCR, guardado no 1º uso) e `opsvault-tiles` (blocos do mapa); os dois últimos sobrevivem às atualizações.
+Cache offline: `opsvault-v8` (arquivos do app, pré-carregados), `opsvault-ocr-t7` (OCR, guardado no 1º uso), `opsvault-lib-t1` (pdf.js e fflate, guardados no 1º uso) e `opsvault-tiles` (blocos do mapa); os três últimos sobrevivem às atualizações.
 
 > Antes de usar em serviço, confirme a política da sua instituição e a LGPD para dados de investigação.

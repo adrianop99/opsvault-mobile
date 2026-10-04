@@ -225,3 +225,19 @@ details.optl[open]{padding-bottom:6px}
 .xchip .sub{margin-top:2px;font-size:11.5px}
 .xchip:active{background:rgba(255,170,60,.2)}
 .xg .list .li{padding:9px 2px;align-items:center}
+/* v0.7 — extração, fotos e documentos em lote */
+.viewer.expanel{display:block;align-items:initial;justify-content:initial;overflow:auto;-webkit-overflow-scrolling:touch;z-index:45;padding:calc(var(--safe-t) + 14px) 16px calc(var(--safe-b) + 40px);background:linear-gradient(180deg,#0a1220,#04060a)}
+.expanel .exhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.excard.off{opacity:.55}
+.excard .exf label{margin:10px 4px 4px}
+.excard input,.excard textarea{padding:10px 12px;font-size:14px}
+.excard .exmenu{width:48px;flex:0 0 48px;padding:6px 0;text-align:center;text-align-last:center;font-size:16px;background:rgba(255,255,255,.06);-webkit-appearance:none;appearance:none}
+.excard > .row{gap:8px;flex-wrap:nowrap}
+.excard > .row .ocrl{white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.exchip{position:relative;white-space:normal;text-align:left;max-width:100%;padding:6px 10px;line-height:1.35}
+.exchip .exmvb{color:#9cbcff;margin-left:2px}
+.exchip select.exmv{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;padding:0;font-size:16px}
+.exdoc{display:flex;gap:12px;align-items:center;margin:10px 0 2px}
+.exprow{display:flex;gap:12px;align-items:center;padding:10px;border-radius:16px;margin-bottom:8px}
+.exprow .exfn{font-size:13px;font-weight:600;word-break:break-all}
+.exprow select{margin-top:6px;padding:8px 10px;font-size:14px}

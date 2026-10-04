@@ -1,6 +1,6 @@
 'use strict';
 /* ============ OpsVault Mobile — by @aiforge.team ============ */
-const APP_NAME = "OpsVault Mobile", APP_SHORT = "OpsVault", CREDIT = "by @aiforge.team", APP_VER = "v0.6", APP_CACHE = "opsvault-v7"; // APP_CACHE = nome do cache em sw.js
+const APP_NAME = "OpsVault Mobile", APP_SHORT = "OpsVault", CREDIT = "by @aiforge.team", APP_VER = "v0.7", APP_CACHE = "opsvault-v8"; // APP_CACHE = nome do cache em sw.js
 const $ = s => document.querySelector(s);
 const APP = $('#app');
 const enc = new TextEncoder(), dec = new TextDecoder();
@@ -95,6 +95,7 @@ function lock(why) {
   try { stopRecorder(); } catch (e) {}
   if (OFF_RUN) OFF_RUN.stop = true; MF = null; window._mapRender = null;
   try { stopDict(); ocrStop(); } catch (e) {}
+  try { exPanelClose(); if (DOCQ) { DOCQ.files.forEach(x => URL.revokeObjectURL(x.url)); DOCQ = null; } } catch (e) {} // v0.7: conferências abertas e fila de documentos somem ao travar
   try { trackStop(true); } catch (e) {} try { measureEnd && measureEnd(); } catch (e) {}
   try { stopPlayer(); } catch (e) {} audioCache.forEach(u => URL.revokeObjectURL(u)); audioCache.clear();
   KEY = null; S = null; imgCache.forEach(u => URL.revokeObjectURL(u)); imgCache.clear(); clearTimeout(idleT); DB.use(false);
@@ -104,8 +105,9 @@ function lock(why) {
 
 /* ---------- UI helpers ---------- */
 function toast(m, ms = 2600) { const t = $('#toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(t._t); t._t = setTimeout(() => t.classList.add('hidden'), ms); }
-function sheet(html, onMount) { $('#sheet').innerHTML = '<div class="grab"></div>' + html; $('#sheet-wrap').classList.remove('hidden'); onMount && onMount($('#sheet')); micify($('#sheet')); }
-function closeSheet() { stopDict(); $('#sheet-wrap').classList.add('hidden'); $('#sheet').innerHTML = ''; }
+let SHEET_HASH = null; // rota em que a folha foi aberta: trocar de rota (hash) fecha a folha
+function sheet(html, onMount) { SHEET_HASH = location.hash; $('#sheet').innerHTML = '<div class="grab"></div>' + html; $('#sheet-wrap').classList.remove('hidden'); onMount && onMount($('#sheet')); micify($('#sheet')); }
+function closeSheet() { SHEET_HASH = null; stopDict(); $('#sheet-wrap').classList.add('hidden'); $('#sheet').innerHTML = ''; }
 $('#sheet-bg').onclick = closeSheet;
 function confirmBox(msg, okTxt = 'Confirmar', danger = false) {
   return new Promise(res => { sheet(`<h2 style="margin-top:0">${esc(msg)}</h2><div class="grid2" style="margin-top:16px"><div class="btn" id="cn">Cancelar</div><div class="btn ${danger?'dan':'pri'}" id="ok">${esc(okTxt)}</div></div>`, s => { s.querySelector('#cn').onclick = () => { closeSheet(); res(false); }; s.querySelector('#ok').onclick = () => { closeSheet(); res(true); }; }); });
@@ -140,7 +142,7 @@ function capaId(a, fallback = 'last') {
 const fotosCapaPrimeiro = a => { const fs = a.fotos || []; const c = a.capa && fs.find(f => f.id === a.capa); return c ? [c, ...fs.filter(f => f !== c)] : fs.slice(); };
 
 /* ---------- Roteador ---------- */
-addEventListener('hashchange', route);
+addEventListener('hashchange', () => { if (SHEET_HASH !== null && SHEET_HASH !== location.hash && !$('#sheet-wrap').classList.contains('hidden')) closeSheet(); route(); });
 async function route() {
   const h = (location.hash || '#ops').slice(1).split('/');
   if (h[0] === 'acao') { if (ACOES[h[1]]) PEND_ACAO = h[1]; history.replaceState(null, '', location.pathname + '#ops'); h.splice(0, h.length, 'ops'); if (KEY) setTimeout(runAcao, 250); }
@@ -1072,6 +1074,9 @@ async function viewCofre() {
   <h2>Importar e exportar</h2><div class="card glass" style="padding:0;cursor:default">
     <div class="tgrow" id="pl_all" style="cursor:pointer"><div>Exportar planilha<div class="sub">todas as operações — texto com | (reimportável) ou CSV</div></div><span>📊</span></div>
     <div class="tgrow" id="imp_lote" style="cursor:pointer"><div>Importar em lote<div class="sub">colar lista ou arquivo .txt/.csv (campos separados por |)</div></div><span>⬆️</span></div>
+    <div class="tgrow" id="imp_ex" style="cursor:pointer"><div>Extrair alvos de texto/documento<div class="sub">BO, relatório, WhatsApp, PDF ou Word — com conferência</div></div><span>🧾</span></div>
+    <div class="tgrow" id="imp_docs" style="cursor:pointer"><div>Ler documentos em lote<div class="sub">várias fotos de RG/CNH, OCR no aparelho</div></div><span>🪪</span></div>
+    <div class="tgrow" id="imp_fotos" style="cursor:pointer"><div>Fotos em lote pelo nome do arquivo<div class="sub">CPF, RG ou nome do alvo no nome da foto</div></div><span>🖼️</span></div>
     <div class="tgrow" id="imp_opv" style="cursor:pointer"><div>Importar operação<div class="sub">arquivo .opsvault vindo de outro aparelho — junta com os dados atuais</div></div><span>📦</span></div></div>
   <h2>Mapas offline</h2><div class="card glass" style="padding:0;cursor:default">
     <div class="tgrow" id="off_m" style="cursor:pointer"><div>Mapas guardados no aparelho<div class="sub">${S.offline.length} área(s) baixada(s) · servidor ${isOsm(tileUrl()) ? 'OpenStreetMap' : 'personalizado'}</div></div><span>🗺️</span></div></div>
@@ -1090,6 +1095,7 @@ async function viewCofre() {
   $('#imp_lote').onclick = () => importBatch(); $('#pl_all').onclick = () => planilhaUI();
   $('#bkd').onchange = async e => { S.cfg.bkDays = +e.target.value; delete S.cfg.bkSnooze; await save(); toast(S.cfg.bkDays ? `Lembrete de backup a cada ${S.cfg.bkDays} dia(s)` : 'Lembrete de backup desligado'); };
   $('#imp_opv').onclick = () => importOpUI();
+  $('#imp_ex').onclick = () => extractUI(); $('#imp_docs').onclick = () => docBatchUI(); $('#imp_fotos').onclick = () => photoBatchUI();
   $('#idle').onchange = async e => { S.cfg.idle = +e.target.value; await save(); resetIdle(); toast('Trava automática: ' + S.cfg.idle + ' min'); };
   $('#bk').onclick = async () => { try { if (await doBackup()) route(); } catch (e) { console.error(e); toast('Erro: ' + e.message); } };
   $('#rs').onclick = () => { pickFile(null, async file => {
@@ -1169,6 +1175,9 @@ function viewAjuda() {
     ['🙂 Face ID / biometria', `<ul><li>Aparece em <b>Cofre → Privacidade e acesso</b> só se o aparelho tiver Face ID/digital disponível para sites (iPhone instalado na Tela de Início, Android com bloqueio de tela).</li><li>Para ativar, confirme o PIN; o aparelho cria uma credencial protegida por biometria. Na tela de bloqueio surge <b>Face ID / biometria</b>.</li><li>Quando o aparelho suporta a extensão <b>PRF</b>, a chave do cofre fica embrulhada por um segredo que só sai após a biometria.</li><li>Sem PRF, funciona como <b>“porta” de conveniência</b>: a chave fica guardada pelo aparelho. Quem copiar o armazenamento do aparelho poderia abrir sem o PIN.</li><li><b>O PIN é sempre a chave-mestra.</b> Trocar o PIN desativa a biometria. A biometria ativada no cofre falso abre só o falso; a do real abre só o real.</li></ul>`],
     ['🎤 Ditado por voz', `<ul><li>Nos campos de texto de anotação e observação (Anotar, Nota rápida, observação do local, descrição da operação, pendência, vínculos e filiação) aparece um <b>🎤</b> no canto. Toque, fale e o texto é <b>acrescentado ao final</b> do que já está escrito. Toque de novo para parar.</li><li>Confira o texto antes de salvar — nomes e números costumam sair errados.</li><li>O botão só aparece se o navegador tiver reconhecimento de fala. Na primeira vez, permita o microfone.</li></ul><div class="warn" style="margin-bottom:0">🔐 <b>Privacidade:</b> o reconhecimento de fala é feito pelo sistema/navegador e <b>pode ser processado em servidores externos</b> — no iPhone, pela <b>Apple</b>; no Android/Chrome, pelo <b>Google</b>. O áudio não passa pelo cofre, mas sai do aparelho. Para conteúdo sensível, digite. Alternativa: o <b>🎤 do próprio teclado</b> do iPhone (que, conforme o modelo e o idioma, também pode usar os servidores da Apple).</div>`],
     ['🔎 Ler documento e placa (OCR)', `<p>A leitura é feita <b>no próprio aparelho</b> (tesseract, português). A imagem <b>não é enviada</b> para nenhum servidor. Na 1ª leitura, o leitor (~6 MB) é carregado do endereço do app e fica guardado para uso sem internet.</p><ol><li><b>🪪 Ler documento</b> (no topo de <b>Novo alvo</b> / <b>Editar</b>): fotografe ou escolha a imagem do <b>RG ou CNH</b>. O app procura <b>nome, CPF</b> (com conferência dos dígitos verificadores), <b>RG</b>, <b>data de nascimento</b> e <b>filiação</b>.</li><li>Abre a tela <b>Conferir leitura</b>: corrija o que precisar e marque só os campos que quer usar. <b>Preencher campos</b> copia para o formulário — <b>nada é salvo</b> até você tocar em <b>Salvar alvo</b>.</li><li>Com <b>Guardar esta imagem como foto do documento</b> ligado, a imagem vira a 🪪 foto do documento do alvo (criptografada, fora da galeria) ao salvar.</li><li><b>🚗 Ler placa</b> (ao lado de Veículo): escolha a foto, <b>arraste um retângulo</b> bem justo em volta da placa e toque em <b>Ler placa</b>. Aceita o modelo antigo (<span class="kbd">ABC-1234</span>) e o Mercosul (<span class="kbd">ABC1D23</span>), corrigindo trocas comuns pela posição (O/0, I/1, B/8, S/5, Z/2). Confirme e a placa vai para o campo Veículo.</li></ol><div class="warn" style="margin-bottom:0">A <b>precisão varia</b>: documento plano, boa luz, sem reflexo do plástico, foto de frente e só o documento no quadro ajudam muito. CNH digital (tela) e RG antigo manuscrito costumam falhar. Sempre confira com o documento.</div>`],
+    ['🧾 Extrair alvos de texto, PDF e Word (v0.7)', `<p>Transforma um <b>BO, relatório ou mensagem</b> em alvos, sem digitar tudo. Abra em <b>Cofre → Extrair alvos de texto/documento</b> ou em <b>Importar em lote</b> (na operação ou no Cofre).</p><ol><li><b>Cole o texto</b> ou toque em <b>📎 Escolher PDF, Word (.docx) ou .txt</b>. O PDF com texto é lido direto; o <b>PDF digitalizado</b> (imagem) pode ser lido com o OCR do aparelho (até 15 páginas). Word antigo <span class="kbd">.doc</span> não é aceito: salve como <span class="kbd">.docx</span> ou PDF.</li><li>O app procura <b>nomes</b> (sequências em MAIÚSCULAS, “nome:”, “qualificado como”…), <b>vulgo</b> (“vulgo”, “v.”, “alcunha”, “conhecido como”), <b>filiação</b> (“filho de”, “filiação”), <b>CPF</b> (confere os dígitos), <b>RG</b>, <b>telefones</b>, <b>placas</b> (antiga e Mercosul) com o veículo, <b>nascimento</b> (perto de “nasc.”, “nascido”, “DN”) e <b>endereços</b> (Rua, Av., Travessa… com número ou bairro).</li><li>Os dados são agrupados em <b>pessoas</b> pela proximidade (no mesmo parágrafo, perto do nome). Na tela <b>Conferir extração</b>: corrija os campos, marque/desmarque cada pessoa, toque em <b>⇄</b> para mover um telefone, placa ou endereço para outra pessoa, use <b>⋯ → Juntar</b> para unir dois cartões ou <b>Remover</b>, e <b>＋ Adicionar pessoa</b>. O que ficou sem nome por perto aparece em <b>Dados soltos</b>.</li><li>Escolha a <b>operação</b> (ou crie uma) e toque em <b>Conferir duplicados</b>: quem já existe na operação (mesmo CPF/RG ou mesmo nome) pode ser <b>completado</b> (só campos vazios + telefones/placas novos), criado de novo ou ignorado.</li><li>Opcional: <b>guardar o texto de origem</b> como anotação criptografada em cada alvo, com o nome do arquivo e o SHA-256.</li></ol><div class="warn" style="margin-bottom:0">A extração é <b>automática e aproximada</b>: pode juntar dados da pessoa errada, cortar nomes ou não ver dados escritos de forma incomum. Nada é criado sem a sua conferência. Tudo é feito no aparelho — o texto e os arquivos não são enviados a lugar nenhum.</div>`],
+    ['🖼️ Fotos em lote pelo nome do arquivo (v0.7)', `<ol><li><b>Cofre → Fotos em lote pelo nome do arquivo</b> (ou em Importar em lote) e escolha <b>várias fotos</b> de uma vez.</li><li>O nome de cada arquivo (sem extensão, sem acento, espaço, maiúscula ou separador) é comparado com os alvos: <b>CPF</b> ou <b>RG/documento</b> (só os dígitos — <span class="kbd">529.982.247-25.jpg</span>, <span class="kbd">52998224725_2.jpg</span>), <b>nome</b> (<span class="kbd">joao_carlos_da_silva.jpg</span>, <span class="kbd">Joao Silva (2).jpg</span>) ou <b>vulgo</b>. Sufixos como <span class="kbd">_2</span>, <span class="kbd">-1</span> e <span class="kbd">(3)</span> são ignorados.</li><li>Na tabela, confira o alvo de cada foto (troque na lista ou marque <b>não importar</b>). As sem correspondência ficam separadas. Em <b>Procurar alvos em</b>, limite a uma operação ou use todas.</li><li>As fotos entram como <b>fotos do álbum</b>: data e GPS do EXIF, SHA-256 do arquivo original, criptografadas; opcionalmente a 1ª vira <b>capa</b> (se o alvo não tiver capa escolhida) e ganha <b>carimbo</b>.</li></ol>`],
+    ['🪪 Leitura de documentos em lote (v0.7)', `<ol><li><b>Cofre → Ler documentos em lote</b> (ou em Importar em lote). <b>📷 Fotografar</b> um por um ou <b>🖼️ Escolher várias</b> imagens de RG/CNH; toque numa miniatura para tirar da fila.</li><li><b>Ler N documento(s)</b>: as imagens são lidas <b>uma por vez</b>, no aparelho, com barra de progresso e <b>Cancelar</b>, que pausa a fila: <b>continue</b> de onde parou ou <b>confira</b> o que já foi lido.</li><li>Cada documento vira um cartão com nome, CPF (com verificação dos dígitos), RG, nascimento e filiação, a miniatura da imagem e o texto lido. Corrija, marque/desmarque, junte cartões do mesmo documento (frente e verso) e escolha a operação.</li><li>Na etapa de <b>duplicados</b>, complete um alvo existente ou crie novos. Com <b>Guardar como foto do documento</b>, a imagem vira a 🪪 foto do documento do alvo (criptografada, com SHA-256; num alvo que já tem foto do documento, ela <b>não</b> é trocada).</li></ol><div class="warn" style="margin-bottom:0">O OCR <b>erra</b> com reflexo, foto torta ou CNH digital na tela. Confira cada número com o documento antes de salvar.</div>`],
     ['🛡️ Segurança', `<ul><li>O app trava sozinho após inatividade (ajuste na aba Cofre) e sempre que sai da tela.</li><li>Nada é enviado para servidor: sem nuvem, sem conta.</li><li>Use um PIN diferente do desbloqueio do celular.</li><li>Antes de usar em serviço, confirme a política da sua instituição e a LGPD para dados de investigação.</li></ul>`]
   ];
   APP.innerHTML = `<div class="brand">${esc(APP_NAME)}</div><h1>Ajuda</h1><div class="sub" style="margin:4px 4px 14px">Guia rápido. Toque num tópico para abrir.</div>
@@ -1264,6 +1273,8 @@ function parseBatch(text){
 function importBatch(defaultOpId){
   const defOp = defaultOpId ? getOp(defaultOpId) : null;
   sheet(`<h2 style="margin-top:0">Importar em lote</h2>
+    ${exModesHtml()}
+    <h2 style="margin-top:14px">Lista com | (planilha)</h2>
     <div class="sub" style="margin:0 0 8px;line-height:1.4">Um alvo por linha, campos separados por <b>|</b> (barra vertical):</div>
     <div class="card glass" style="cursor:default;padding:10px 12px;font-size:11px;word-break:break-all;color:#9cbcff">${esc(BATCH_HEADER)}</div>
     ${defOp?`<div class="sub" style="margin:8px 4px">Operação padrão (quando o campo <b>operação</b> ficar vazio): <b>${esc(defOp.nome)}</b></div>`:''}
@@ -1271,7 +1282,7 @@ function importBatch(defaultOpId){
     <div class="grid2" style="margin-top:12px"><div class="btn" id="ib_file">📄 Arquivo .txt/.csv</div><div class="btn" id="ib_modelo">⬇️ Baixar modelo</div></div>
     <div class="gap"></div><div class="btn pri" id="ib_prev">Pré-visualizar</div>
     <div class="credit">${esc(APP_NAME)} · <b>${esc(CREDIT)}</b></div>`, s=>{
-    s.querySelector('#ib_modelo').onclick=()=>modeloBatch();
+    exModesBind(s, defaultOpId); s.querySelector('#ib_modelo').onclick=()=>modeloBatch();
     s.querySelector('#ib_file').onclick=()=>{
       pickFile('.txt,.csv,text/plain,text/csv', async f=>{ try{ s.querySelector('#ib_t').value=await f.text(); toast('Arquivo carregado'); }catch(e){ toast('Erro ao ler: '+e.message); } });
     };
@@ -1334,12 +1345,15 @@ async function doImportBatch(valid, newOpNames, state){
 
 
 /* Seletor de arquivo compatível com iPhone: input fixo no DOM, sem accept para tipos desconhecidos */
-function pickFile(accept, cb) {
+/* v0.7: multiple = true → cb recebe a lista de arquivos (seleção de várias fotos no iPhone) */
+function pickFile(accept, cb, multiple) {
   let inp = document.getElementById('pick');
   if (!inp) { inp = document.createElement('input'); inp.type = 'file'; inp.id = 'pick'; inp.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0'; document.body.appendChild(inp); }
   if (accept) inp.setAttribute('accept', accept); else inp.removeAttribute('accept');
-  inp.value = ''; hold(180000);
-  inp.onchange = () => { release(); const f = inp.files && inp.files[0]; if (f) cb(f); };
+  inp.multiple = !!multiple;
+  inp.value = ''; hold(multiple ? 300000 : 180000);
+  inp.oncancel = () => release();
+  inp.onchange = () => { release(); const fs = [...(inp.files || [])]; inp.value = ''; if (!fs.length) return; if (multiple) cb(fs); else cb(fs[0]); };
   inp.click();
 }
 
@@ -2452,7 +2466,8 @@ async function ocrWorker() {
 function ocrStop() { if (TESS) { const t = TESS; TESS = null; t.then(w => w.terminate()).catch(() => {}); } OCR_PROG = null; } // ao travar: libera memória e o texto lido
 async function runOcr(cv, params, onProg) {
   OCR_PROG = onProg || null;
-  try { const w = await ocrWorker(); await w.setParameters(Object.assign({tessedit_char_whitelist: '', tessedit_pageseg_mode: '3', preserve_interword_spaces: '1', user_defined_dpi: '300'}, params || {})); const {data} = await w.recognize(cv); return data; }
+  try { const w = await ocrWorker(), tp = TESS; const live = () => { if (!tp || TESS !== tp) throw new Error('leitura cancelada'); }; // leitor encerrado (Cancelar/travar) no meio: não manda mais nada a ele
+    live(); await w.setParameters(Object.assign({tessedit_char_whitelist: '', tessedit_pageseg_mode: '3', preserve_interword_spaces: '1', user_defined_dpi: '300'}, params || {})); live(); const {data} = await w.recognize(cv); return data; }
   finally { OCR_PROG = null; }
 }
 const ocrStepTxt = m => ({'loading tesseract core': 'Carregando o leitor…', 'initializing tesseract': 'Preparando…', 'loading language traineddata': 'Carregando o português…', 'initializing api': 'Preparando…', 'recognizing text': 'Lendo o texto…'})[m.status] || 'Preparando…';
@@ -3112,6 +3127,617 @@ function viewCruzamentos(filt) {
 }
 /* relatório: cruzamentos que envolvem a operação (inclui arquivadas, para o documento ficar completo) */
 const xForOp = opId => xGroups(true).filter(g => g.its.some(x => x.opId === opId));
+
+/* ============ v0.7 — Extrair alvos de texto/PDF/Word, fotos em lote pelo nome e leitura de documentos em lote — by @aiforge.team ============ */
+/* Tudo roda no aparelho: pdf.js e fflate vêm de lib/ sob demanda (cache no 1º uso); nada é enviado a servidor.
+   Nenhum alvo é criado sem a tela de conferência. */
+const EX_L = 'A-Za-zÀ-ÖØ-öø-ÿ', EX_U = 'A-ZÀ-ÖØ-Þ';
+const EX_STOP = new Set(('BOLETIM OCORRENCIA OCORRENCIAS POLICIA CIVIL MILITAR FEDERAL RODOVIARIA ESTADO ESTADUAL SECRETARIA SEGURANCA PUBLICA DEFESA SOCIAL DELEGACIA DISTRITO DISTRITAL REGIONAL ' +
+  'METROPOLITANA RELATORIO RELATO INVESTIGACAO INQUERITO HISTORICO QUALIFICACAO ENVOLVIDOS ENVOLVIDO ENVOLVIDA AUTOR AUTORA AUTORES VITIMA VITIMAS TESTEMUNHA TESTEMUNHAS CONDUZIDO CONDUZIDA CONDUZIDOS ' +
+  'SUSPEITO SUSPEITA SUSPEITOS INVESTIGADO INVESTIGADA NATUREZA FATO FATOS LOCAL DATA HORA HORARIO CPF RG SSP SDS SSPDS CNH UF BAIRRO CENTRO RUA AVENIDA AV TRAVESSA ALAMEDA ESTRADA RODOVIA PRACA VILA CONJUNTO ' +
+  'QUADRA LOTE CEP NUMERO APTO APARTAMENTO BLOCO CASA CIDADE MUNICIPIO COMARCA BRASIL REPUBLICA FEDERATIVA NOME VULGO ALCUNHA APELIDO FILIACAO PAI MAE NASCIMENTO NASCIDO NASCIDA NATURAL NATURALIDADE ' +
+  'NACIONALIDADE BRASILEIRO BRASILEIRA SOLTEIRO SOLTEIRA CASADO CASADA PROFISSAO ENDERECO TELEFONE TELEFONES CELULAR CONTATO VEICULO VEICULOS PLACA MARCA MODELO COR OBS OBSERVACAO OBSERVACOES ANEXO PAGINA FOLHA ' +
+  'DOCUMENTO DOCUMENTOS ASSUNTO REFERENCIA PROCESSO MANDADO PRISAO BUSCA APREENSAO OPERACAO ORDEM SERVICO EQUIPE VIATURA GUARNICAO DROGA DROGAS ARMA ARMAS FOGO MUNICAO TRAFICO ENTORPECENTES ROUBO FURTO ' +
+  'HOMICIDIO LESAO CORPORAL AMEACA ART LEI CODIGO PENAL MINISTERIO JUSTICA PODER JUDICIARIO TRIBUNAL VARA CRIMINAL JUIZ JUIZA PROMOTOR PROMOTORA DELEGADO DELEGADA ESCRIVAO ESCRIVA AGENTE INSPETOR INVESTIGADOR ' +
+  'SOLDADO CABO SARGENTO TENENTE CAPITAO MAJOR CORONEL PM PC PF PRF GCM DETRAN NUCLEO SETOR SECAO DIVISAO DEPARTAMENTO COORDENADORIA DIRETORIA SUPERINTENDENCIA WHATSAPP MENSAGEM MENSAGENS AUDIO FOTO FOTOS ' +
+  'VIDEO IMAGEM URGENTE ATENCAO INFORMACAO INFORMACOES DADOS SIM NAO OK PIX BANCO CONTA TIPO SEXO MASCULINO FEMININO IDADE ANOS RESERVADO CONFIDENCIAL SIGILOSO PROTOCOLO REGISTRO GERAL IDENTIDADE CARTEIRA ' +
+  'NACIONAL HABILITACAO EXPEDICAO EMISSOR ORGAO VALIDADE CATEGORIA JANEIRO FEVEREIRO MARCO ABRIL MAIO JUNHO JULHO AGOSTO SETEMBRO OUTUBRO NOVEMBRO DEZEMBRO SEGUNDA TERCA QUARTA QUINTA SEXTA SABADO DOMINGO ' +
+  'FEIRA FIAT VW VOLKSWAGEN CHEVROLET GM FORD HONDA YAMAHA TOYOTA HYUNDAI RENAULT NISSAN JEEP PEUGEOT CITROEN MITSUBISHI KIA BMW AUDI MERCEDES GOL UNO PALIO ONIX CELTA CORSA HB20 STRADA SAVEIRO FOX POLO KA ' +
+  'FIESTA CIVIC COROLLA HILUX S10 BIZ FAN TITAN CG FAZER PRATA PRETO PRETA BRANCO BRANCA VERMELHO VERMELHA AZUL CINZA VERDE AMARELO AMARELA MOTO CARRO MOTOCICLETA AUTOMOVEL CAMINHONETE ' +
+  'FOI FORAM ERA ESTAVA ESTAVAM SER SENDO SAO TEM TINHA HAVIA QUE QUAL QUANDO ONDE COMO POIS PORQUE MAS OU SE JA AINDA MUITO POUCO MAIS MENOS ATE APOS ANTES DEPOIS DURANTE ENTRE SOBRE SOB PARA PELA PELO ' +
+  'PELOS PELAS COM SEM NA NO NAS NOS EM UM UMA UNS UMAS OS AS AO AOS ESTE ESTA ESSE ESSA ISSO ISTO AQUI ALI LA SEU SUA SEUS SUAS ELE ELA ELES ELAS LHE ABORDADO ABORDADA ABORDADOS PRESO PRESA PRESOS DETIDO ' +
+  'DETIDA LOCALIZADO LOCALIZADA IDENTIFICADO IDENTIFICADA RESIDENTE RESIDENTES DOMICILIADO DOMICILIADA PORTADOR PORTADORA INSCRITO INSCRITA FILHO FILHA CONHECIDO CONHECIDA PROPRIETARIO CONDUTOR PASSAGEIRO ' +
+  'MOTORISTA ACOMPANHADO ACOMPANHADA JUNTAMENTE TAMBEM MESMO MESMA REFERIDO REFERIDA CITADO CITADA ACIMA ABAIXO SEGUINTE SEGUINTES SEGUNDO CONFORME BOM BOA DIA TARDE NOITE SR SRA DR DRA HOJE ONTEM ' +
+  'GRUPO FACCAO COMANDO VERMELHO CAPITAL PRIMEIRO GUARDIOES TERCEIRO PASSAGENS POLICIAIS ANTECEDENTES CRIMINAIS QUALIFICADO QUALIFICADA DEMAIS OUTROS OUTRAS TODOS NADA CONSTA INFORMOU INFORMA RELATOU DISSE').split(' '));
+const EX_ROLE = [['autor', /\bautor(?:a|es)?\b/i], ['vítima', /\bv[ií]tima/i], ['testemunha', /\btestemunha/i], ['conduzido', /\bconduzid[oa]/i], ['suspeito', /\bsuspeit[oa]/i], ['investigado', /\binvestigad[oa]/i]];
+const exKey = s => _norm(s).replace(/\s+/g, ' ');
+const exUp = s => _norm(s).toUpperCase();
+function exClean(t) {
+  return String(t || '').replace(/\r\n?/g, '\n').replace(/[\u00a0\u2007\u202f]/g, ' ').replace(/[\u200b-\u200d\ufeff]/g, '')
+    .replace(/^\[\d{1,2}[:h]\d{2}(?::\d{2})?,? \d{1,2}\/\d{1,2}\/\d{2,4}\] [^:\n]{1,40}: ?/gm, '')          // WhatsApp (iPhone) [10:32, 01/10/2026] Fulano:
+    .replace(/^\[?\d{1,2}\/\d{1,2}\/\d{2,4},? \d{1,2}:\d{2}(?::\d{2})?\]? (?:- )?[^:\n]{1,40}: ?/gm, '')     // WhatsApp (Android) 01/10/2026 10:32 - Fulano:
+    .replace(/<(?:M[íi]dia oculta|Media omitted)>/gi, '').replace(/[ \t]+\n/g, '\n');
+}
+const exPhoneFmt = d => d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d.length === 9 ? d.slice(0, 5) + '-' + d.slice(5) : d.slice(0, 4) + '-' + d.slice(4);
+function exPhoneDigits(run) { // dígitos de um telefone brasileiro (sem +55/0+operadora) ou ''
+  let d = _digits(run); if (/^\s*\+?\s*55/.test(run) && (d.length === 12 || d.length === 13)) d = d.slice(2);
+  else if (/^0/.test(d)) { d = d.replace(/^0+/, ''); if (d.length === 12 || d.length === 13) d = d.slice(2); }
+  if (d.length === 11) return DDD_OK(d.slice(0, 2)) && d[2] === '9' ? d : '';
+  if (d.length === 10) return DDD_OK(d.slice(0, 2)) && /[2-9]/.test(d[2]) ? d : '';
+  if (d.length === 9) return d[0] === '9' ? d : '';
+  return d.length === 8 && /[2-9]/.test(d[0]) ? d : '';
+}
+const EX_VEIC_RE = /\b(?:ve[ií]culo|carro|moto(?:cicleta)?|autom[óo]vel|caminhonete|caminh[ãa]o|camioneta|fiat|vw|volkswagen|chevrolet|gm|ford|honda|yamaha|toyota|hyundai|renault|nissan|jeep|peugeot|citro[eë]n|mitsubishi|kia|bmw|audi|mercedes|gol|uno|palio|onix|celta|corsa|hb ?20|strada|saveiro|fox|polo|ka|fiesta|civic|corolla|hilux|s ?10|biz|fan|titan|cg ?\d*|fazer|prisma|cobalt|spin|sandero|logan|kwid|argo|mobi|toro|compass|renegade|creta|tracker|voyage|siena|fusca)\b/i;
+const EX_PLATE_BAD = new Set('ANO DIA MES TEL CEL CPF CEP APT NUM ART LEI RUA BOX LOT KMS HRS MIN SEG POR COM SEM DAS DOS QUE NAS NOS UMA AOS ATE MAS SUA SEU ELE ELA REF PAG FLS VOL OBS TOT QTD VAL PRF SSP SDS NRO FIG TAB CAP INC'.split(' '));
+/* blocos (parágrafos) — a proximidade só vale dentro do mesmo bloco */
+function exBlocks(t) { const b = [0]; const re = /\n[ \t]*\n+|\n(?=[ \t]*(?:\d{1,2}\s*[).º°-]\s|[-•*]\s|(?:AUTOR|V[ÍI]TIMA|TESTEMUNHA|CONDUZIDO|ENVOLVIDO|SUSPEITO|INVESTIGADO)[A-ZÀ-Ú]*\s*\d*\s*[:\-–]))/gi; let m; while ((m = re.exec(t))) b.push(m.index + 1); return b; }
+const exBlockOf = (bs, i) => { let lo = 0, hi = bs.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (bs[mid] <= i) lo = mid; else hi = mid - 1; } return lo; };
+/* recorta uma sequência de palavras em trechos com cara de nome (≥ 2 palavras, sem palavras de formulário/verbos comuns) */
+function exNameRuns(words) {
+  const out = []; let cur = [];
+  const flush = () => { while (cur.length && PART.has(cur[cur.length - 1].w.toLowerCase())) cur.pop(); while (cur.length && PART.has(cur[0].w.toLowerCase())) cur.shift(); if (cur.filter(x => !PART.has(x.w.toLowerCase()) && x.w.length >= 2).length >= 2) out.push(cur.slice()); cur = []; };
+  for (const x of words) { const u = exUp(x.w); if (EX_STOP.has(u) || /\d/.test(x.w) || (x.w.length === 1 && !/^[eE]$/.test(x.w))) flush(); else cur.push(x); }
+  flush(); return out;
+}
+function extractEntities(text) {
+  const T = exClean(text), bs = exBlocks(T); let M = T; // M = cópia mascarada (o que já foi reconhecido vira espaço)
+  const ents = [], anchors = [];
+  const mask = (i, j) => { M = M.slice(0, i) + ' '.repeat(j - i) + M.slice(j); };
+  const near = (i, re, back = 30) => re.test(T.slice(Math.max(0, i - back), i));
+  const scan = (re, fn) => { re.lastIndex = 0; const hits = []; let m; while ((m = re.exec(M))) { hits.push(m); if (!m[0].length) re.lastIndex++; } hits.forEach(fn); };
+  const cut = (s, max) => { // fim do trecho: quebra de linha, ; ou próximo rótulo
+    const re = /\n|;|[,.]?\s*\b(?:telefone|tel\.?|fone|cel(?:ular)?|whats(?:app)?|zap|cpf|rg|nascid[oa]|nasc\.|natural|filh[oa]\s+de|filia[çc][ãa]o|vulgo|alcunha|conhecid[oa]|portador|inscrit[oa]|ve[ií]culo|placa|e-?mail|residente|domiciliad[oa]|brasileir[oa]|solteir[oa]|casad[oa]|profiss[ãa]o|estado civil)\b|\.\s+(?=[A-ZÀ-Ú])/i;
+    const m = s.slice(0, max).match(re); return m ? m.index : Math.min(s.length, max);
+  };
+  // CPF (com ou sem pontuação; sem pontuação só vale se os dígitos conferirem ou houver o rótulo CPF perto)
+  scan(/(^|[^\d.\/-])(\d{3})([.\s]?)(\d{3})\3(\d{3})\s?[-.\s]?\s?(\d{2})(?![\d])/g, m => {
+    const i = m.index + m[1].length, j = m.index + m[0].length, d = m[2] + m[4] + m[5] + m[6], lab = near(i, /\bc\.?p\.?f\.?\s*(?:n[º°o.]*\s*)?[:\-]?\s*$/i, 22), ok = cpfValid(d), punct = /[.\-]/.test(T.slice(i, j));
+    if (ok || lab || (punct && m[3] === '.')) { ents.push({k: 'cpf', v: cpfFmt(d), ok, i}); mask(i, j); }
+  });
+  // RG (precisa do rótulo)
+  scan(/\b(?:R\.?\s?G\.?|registro\s+geral|c[ée]dula\s+de\s+identidade|carteira\s+de\s+identidade|identidade)(?:\s+civil)?\s*(?:n[º°o.]*\s*)?[:\-]?\s*((?:\d{4,13}|\d{1,2}\.\d{3}\.\d{3})(?!\d)(?:\s?-\s?[\dXx])?)((?:\s*[-–\/]?\s*(?:SSP|SDS|SSPDS|SESP|SESDEC|SJS|SJ|PC|IFP|DETRAN|DGPC|SSPDC|SEJUSP|PCCE|DIC|II|IIRGD)(?:\s*[-\/]?\s*[A-Z]{2}\b)?)?)/gi, m => {
+    const num = m[1].replace(/\s/g, ''), org = (m[2].replace(/^[\s\-–\/]+/, '').replace(/\s*[-\/]\s*/g, '/').trim().match(/^[A-Z]+(?:\/[A-Z]{2}(?![a-z]))?/) || [''])[0];
+    ents.push({k: 'rg', v: num + (org ? ' ' + org : ''), i: m.index}); mask(m.index, m.index + m[0].length);
+  });
+  // datas: nascimento só com palavra de contexto; todas são mascaradas (não viram telefone/RG)
+  scan(/\b(?:nascid[oa]s?|nascimento|data\s+de\s+nascimento|nasc|D\.?\s?N)\b\.?[^\d\n]{0,26}([0-3]?\d)[\/.\-]([01]?\d)[\/.\-]((?:19|20)?\d{2})\b/gi, m => {
+    let [d, mo, y] = [+m[1], +m[2], m[3]]; if (y.length === 2) y = (+y > new Date().getFullYear() % 100 ? '19' : '20') + y;
+    if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && +y >= 1900 && +y <= new Date().getFullYear()) ents.push({k: 'nasc', v: `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`, i: m.index});
+    mask(m.index, m.index + m[0].length);
+  });
+  scan(/\b[0-3]?\d[\/.\-][01]?\d[\/.\-](?:19|20)?\d{2}\b/g, m => mask(m.index, m.index + m[0].length));
+  scan(/\bCEP\s*:?\s*\d{2}\.?\d{3}-?\d{3}\b|\b\d{5}-\d{3}\b/gi, m => mask(m.index, m.index + m[0].length));
+  scan(/\b\d{1,2}[:h]\d{2}(?:min|h)?\b/gi, m => mask(m.index, m.index + m[0].length)); // horários
+  // placas (antiga e Mercosul) + descrição do veículo logo antes
+  scan(/(^|[^A-Za-z0-9])([A-Za-z]{3})([-\s]?)(\d[A-Za-z0-9]\d{2})(?![A-Za-z0-9])/g, m => {
+    const L = m[2], R = m[4], i = m.index + m[1].length, j = m.index + m[0].length, up = L === L.toUpperCase(), pl = (L + R).toUpperCase();
+    if (!/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(pl) || EX_PLATE_BAD.has(L.toUpperCase())) return;
+    const ctx = T.slice(Math.max(0, i - 60), i), hasCtx = /placa|ve[ií]culo/i.test(ctx) || EX_VEIC_RE.test(ctx);
+    if (m[3] === ' ' && !hasCtx) return; if (!up && !hasCtx && m[3] !== '-') return;
+    let desc = ''; const seg = T.slice(Math.max(0, i - 60), i).split(/[.;\n]/).pop(); const vm = seg.match(EX_VEIC_RE);
+    if (vm) desc = seg.slice(vm.index).replace(/\b(?:de\s+)?placas?\b\s*(?:n[º°o.]*)?/gi, ' ').replace(/^(?:ve[ií]culo|carro|autom[óo]vel)\s*(?:marca\s*|modelo\s*)?[:\-]?\s*/i, '').replace(/[\s,:\-–]+$/, '').replace(/\s+/g, ' ').trim();
+    if (vm) mask(Math.max(0, i - 60) + (T.slice(Math.max(0, i - 60), i).length - seg.length) + vm.index, i);
+    ents.push({k: 'veic', v: (desc ? desc + ' ' : '') + plateFmt(pl), i}); mask(i, j);
+  });
+  // telefones BR (+55, 0+operadora, DDD com/sem parênteses, 9º dígito; 8/9 dígitos sem DDD só com rótulo)
+  scan(/\+?\d[\d\s().\-]{6,22}\d/g, m => {
+    let run = m[0], off = 0;
+    while (run) {
+      const d = exPhoneDigits(run);
+      if (d && (d.length >= 10 || near(m.index + off, /\b(?:tel(?:efone)?s?|fone|cel(?:ular)?|contato|whats(?:app)?|zap|wpp)\b[^\n]{0,18}$/i, 30))) {
+        if (!near(m.index + off, /CEP\s*:?\s*$/i, 8)) { ents.push({k: 'tel', v: exPhoneFmt(d), i: m.index + off}); mask(m.index + off, m.index + m[0].length); }
+        return;
+      }
+      const sp = run.search(/[\s(]/); if (sp < 0) return; const nx = run.slice(sp).search(/[\d+(]/); if (nx < 0) return; off += sp + nx; run = run.slice(sp + nx);
+    }
+  });
+  // endereços: Rua/Av./Travessa… até o fim do trecho; precisa de número, s/n ou bairro
+  scan(new RegExp(`(^|[^${EX_L}])(Rua|R\\.|Avenida|Av\\.?|Travessa|Trav\\.|Tv\\.|Alameda|Al\\.|Estrada|Rodovia|Rod\\.|Pra[çc]a|P[çc]a\\.?|Beco|Largo|Viela|Passagem|Conjunto|Cj\\.|Residencial|Loteamento|S[íi]tio|Fazenda|Vila)\\s+`, 'gi'), m => {
+    const i = m.index + m[1].length; if (M[i] === ' ') return; // já reconhecido
+    const s = T.slice(i, i + 220); const pre = s.slice(0, m[2].length + 1); let k = cut(s.slice(pre.length), 200) + pre.length;
+    let addr = s.slice(0, k).replace(/[\s,.;:\-–]+$/, '').replace(/\s+/g, ' ').trim();
+    if (!/\d|s\/n|bairro/i.test(addr) || addr.length < 8) return;
+    ents.push({k: 'end', v: addr, i}); mask(i, i + k);
+  });
+  // filiação: “filho de A e B”, “Filiação: A / B”
+  scan(/\b(?:filh[oa]\s+de|filia[çc][ãa]o)\s*:?\s*/gi, m => {
+    const i = m.index + m[0].length, s = T.slice(i, i + 160); let k = cut(s, 150); const s2 = s.slice(0, k), c2 = s2.search(/,\s*(?!\s*(?:e|d[aeo]s?)\s)/); if (c2 > 0) k = c2;
+    const ps = s.slice(0, k).split(/\s+e\s+|\s*\/\s*|\s*;\s*|\n/).map(x => x.replace(/[^A-Za-zÀ-ÿ' ]+/g, ' ').replace(/\s+/g, ' ').trim()).filter(x => x.split(' ').length >= 2);
+    if (ps.length) ents.push({k: 'fil', v: ps.map(p => p === p.toUpperCase() ? titleName(p) : p).join('\n'), i: m.index});
+    mask(m.index, i + k);
+  });
+  // vulgo / alcunha / conhecido como
+  scan(/(?:\b(?:vulgo|alcunha|apelid(?:o|ad[oa])(?:\s+de)?|conhecid[oa]s?\s+(?:como|por)(?:\s+alcunha)?)|[,(]\s*v\.)\s*:?\s*/gi, m => {
+    const i = m.index + m[0].length, s = T.slice(i, i + 50); const q = s.match(/^["“'‘«]([^"”'’»\n]{1,30})["”'’»]/);
+    let v = q ? q[1] : (s.match(new RegExp(`^[${EX_L}][${EX_L}'\\-]*(?:\\s+(?:d[aeo]s?\\s+)?[${EX_U}][${EX_L}'\\-]*){0,2}`)) || [''])[0];
+    v = v.trim(); if (!v) return; ents.push({k: 'vulgo', v: v === v.toUpperCase() && v.length > 3 ? titleName(v) : v, i: m.index}); mask(m.index, i + (q ? q[0].length : v.length));
+  });
+  // nomes: rótulos (nome:, qualificado como…)
+  const W = `[${EX_U}][${EX_L}'\\-]+`, NAME = `${W}(?:\\s+(?:(?:d[aeo]s?|e|D[AEO]S?|E)\\s+)?${W}){1,7}`;
+  scan(new RegExp(`\\b(nome(?:\\s+completo)?|qualificad[oa]\\s+como|identificad[oa]\\s+como|de\\s+nome|chamad[oa]|o\\s+nacional|a\\s+nacional|autor[a]?|v[ií]tima|testemunha|conduzid[oa]|suspeit[oa]|investigad[oa]|envolvid[oa])(?:\\s*\\d{1,2})?\\s*[:\\-–]?\\s*(?:(?:o|a|sr\\.?|sra\\.?)\\s+)?(${NAME})`, 'gi'), m => {
+    const i = m.index + m[0].length - m[2].length; const words = []; const wr = /\S+/g; let w; while ((w = wr.exec(m[2]))) words.push({w: w[0], i: i + w.index});
+    const runs = exNameRuns(words).filter(r => r.every(x => PART.has(x.w.toLowerCase()) || /^[A-ZÀ-ÖØ-Þ]/.test(x.w))); if (!runs.length) return; const r = runs[0], a = r[0].i, b = r[r.length - 1].i + r[r.length - 1].w.length;
+    if (M.slice(a, b).trim() !== T.slice(a, b).trim()) return;
+    const role = (EX_ROLE.find(([, re]) => re.test(m[1])) || [])[0] || '';
+    anchors.push({i: a, nome: T.slice(a, b), lab: true, role}); mask(a, b);
+  });
+  // nomes: sequências em MAIÚSCULAS e Nomes Próprios (≥ 3 palavras, ou 2 com palavra de contexto antes)
+  scan(new RegExp(`(^|[^${EX_L}])([${EX_U}][${EX_U}'\\-]*(?:[ \\t]+[${EX_U}][${EX_U}'\\-]*){1,12})(?=$|[^${EX_L}])`, 'g'), m => {
+    const i = m.index + m[1].length, words = []; const wr = /\S+/g; let w; while ((w = wr.exec(m[2]))) words.push({w: w[0], i: i + w.index});
+    exNameRuns(words).forEach(r => { const a = r[0].i, b = r[r.length - 1].i + r[r.length - 1].w.length; anchors.push({i: a, nome: T.slice(a, b), lab: false}); mask(a, b); });
+  });
+  scan(new RegExp(`(^|[^${EX_L}])([${EX_U}][a-zà-öø-ÿ'\\-]+(?:[ \\t]+(?:(?:d[aeo]s?|e)[ \\t]+)?[${EX_U}][a-zà-öø-ÿ'\\-]+){1,7})(?=$|[^${EX_L}])`, 'g'), m => {
+    const i = m.index + m[1].length, words = []; const wr = /\S+/g; let w; while ((w = wr.exec(m[2]))) words.push({w: w[0], i: i + w.index});
+    exNameRuns(words).forEach(r => {
+      const a = r[0].i, b = r[r.length - 1].i + r[r.length - 1].w.length, caps = r.filter(x => !PART.has(x.w.toLowerCase())).length;
+      const cue = near(a, /(?:^|[\s,(])(?:o|a|é|sr\.?|sra\.?|nome|elemento|indiv[ií]duo|suspeit[oa]|autor[a]?|v[ií]tima|comparsa|irm[ãa]o?|esposa|marido|companheir[oa]|namorad[oa]|chamad[oa]|primo|prima|tio|tia|parceiro|parceira|cara|mano|mana)\s+$/i, 24);
+      if (caps >= 3 || cue) { anchors.push({i: a, nome: T.slice(a, b), lab: false}); mask(a, b); }
+    });
+  });
+  // papel (autor, vítima…) nas 40 letras antes do nome
+  anchors.forEach(an => { if (!an.role) { const back = T.slice(Math.max(0, an.i - 40), an.i).split(/[.;\n]/).pop(); an.role = (EX_ROLE.find(([, re]) => re.test(back)) || [])[0] || ''; } an.b = exBlockOf(bs, an.i); });
+  anchors.sort((x, y) => x.i - y.i); ents.sort((x, y) => x.i - y.i);
+  return {T, anchors, ents, bs};
+}
+/* agrupa os dados em pessoas candidatas: cada dado vai para o nome mais próximo ANTES dele no mesmo bloco
+   (se não houver, o primeiro nome logo depois, até 160 letras); o resto fica em “dados soltos” */
+function exCandidates(text) {
+  const {T, anchors, ents, bs} = extractEntities(text);
+  const cards = [], byKey = new Map(), loose = [];
+  const cardFor = an => { const k = exKey(an.nome); if (byKey.has(k)) { const c = byKey.get(k); if (!c.papel && an.role) c.papel = an.role; return c; }
+    const nome = an.nome === an.nome.toUpperCase() ? titleName(an.nome.replace(/\s+/g, ' ')) : an.nome.replace(/\s+/g, ' ');
+    const c = exCard({nome, papel: an.role || '', lab: !!an.lab}); byKey.set(k, c); cards.push(c); return c; };
+  anchors.forEach(an => an.c = cardFor(an));
+  for (const e of ents) {
+    const b = exBlockOf(bs, e.i); let an = null;
+    for (const x of anchors) { if (x.b !== b) continue; if (x.i <= e.i) an = x; else { if (!an && x.i - e.i <= 160 && e.k !== 'fil' && e.k !== 'vulgo') an = x; break; } }
+    if (!an) { loose.push(exItem(e.k, e.v, e.ok)); continue; }
+    exPut(an.c, exItem(e.k, e.v, e.ok), loose);
+  }
+  cards.forEach(c => { c.inc = !!(c.cpf || c.rg || c.nasc || c.fil || c.apelido || c.tels.length || c.veics.length || c.ends.length || c.lab); });
+  return {cards, loose, text: T};
+}
+let EX_SEQ = 0;
+const exItem = (k, v, ok) => ({id: 'i' + (++EX_SEQ), k, v, ok: ok !== false});
+function exCard(o) { return Object.assign({id: 'c' + (++EX_SEQ), inc: true, nome: '', apelido: '', cpf: '', rg: '', nasc: '', fil: '', tels: [], veics: [], ends: [], papel: '', lab: false}, o || {}); }
+const EX_LIST = {tel: 'tels', veic: 'veics', end: 'ends'}, EX_SCAL = {cpf: 'cpf', rg: 'rg', nasc: 'nasc', vulgo: 'apelido', fil: 'fil', nome: 'nome'};
+const EX_ICON = {tel: '📞', veic: '🚗', end: '🏠', cpf: '🪪 CPF', rg: '🪪 RG', nasc: '🎂', vulgo: '“”', fil: '👪', nome: '👤'};
+/* põe um dado num cartão; campo único já ocupado → o valor antigo vai para os dados soltos */
+function exPut(c, it, loose) {
+  if (EX_LIST[it.k]) { const L = c[EX_LIST[it.k]]; const key = it.k === 'tel' ? (x => { const n = telNorm(x); return n ? n.ddd + n.l8 : _digits(x); }) : it.k === 'veic' ? (x => platesIn(x)[0] || exKey(x)) : exKey;
+    if (!L.some(x => key(x) === key(it.v))) L.push(it.v); return; }
+  const f = EX_SCAL[it.k]; if (!f) return;
+  if (f === 'fil') { const cur = c.fil ? c.fil.split('\n') : []; it.v.split('\n').forEach(p => { if (p && !cur.some(x => exKey(x) === exKey(p))) cur.push(p); }); c.fil = cur.join('\n'); return; }
+  if (f === 'cpf' && it.ok === false) c.cpfWarn = true;
+  if (!c[f]) { c[f] = it.v; return; }
+  if (exKey(c[f]) === exKey(it.v) || _digits(c[f]) && _digits(c[f]) === _digits(it.v)) return;
+  if (f === 'cpf' && !cpfValid(c[f]) && cpfValid(it.v)) { loose.push(exItem('cpf', c[f], false)); c[f] = it.v; return; }
+  loose.push(it);
+}
+
+/* ---- leitores de arquivo (no aparelho): PDF (pdf.js), Word .docx (fflate), texto ---- */
+async function exPdfLib() {
+  if (!window.pdfjsLib) await loadScript(libUrl('pdfjs/pdf.min.js'));
+  pdfjsLib.GlobalWorkerOptions.workerSrc = libUrl('pdfjs/pdf.worker.min.js'); return pdfjsLib;
+}
+async function exPdfOpen(buf) {
+  const L = await exPdfLib();
+  // isEvalSupported:false — fontes não executam código (proteção recomendada para PDFs de terceiros)
+  return L.getDocument({data: new Uint8Array(buf), isEvalSupported: false, disableFontFace: true, useSystemFonts: false, disableAutoFetch: true, disableStream: true, enableXfa: false, verbosity: 0}).promise;
+}
+async function exPdfText(pdf) {
+  const pages = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const pg = await pdf.getPage(n), tc = await pg.getTextContent(); let s = '', lastY = null, lastEnd = null;
+    for (const it of tc.items) {
+      if (!('str' in it)) continue; const x = it.transform[4], y = it.transform[5], h = Math.abs(it.transform[3]) || it.height || 10;
+      if (lastY !== null && Math.abs(y - lastY) > h * .6) { if (!/\n$/.test(s)) s += '\n'; if (Math.abs(y - lastY) > h * 2.2 && !/\n\n$/.test(s)) s += '\n'; } // linha em branco → novo bloco (proximidade)
+      else if (lastEnd !== null && x - lastEnd > h * .25 && s && !/\s$/.test(s) && !/^\s/.test(it.str)) s += ' ';
+      s += it.str; if (it.hasEOL) s += '\n'; lastY = y; lastEnd = x + (it.width || 0);
+    }
+    pages.push(s.replace(/[ \t]+\n/g, '\n').trim()); pg.cleanup();
+  }
+  return pages;
+}
+async function exPdfPageCanvas(pdf, n, maxSide = 2200) {
+  const pg = await pdf.getPage(n), v1 = pg.getViewport({scale: 1}), sc = Math.min(3, maxSide / Math.max(v1.width, v1.height)), vp = pg.getViewport({scale: sc});
+  const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height); const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+  await pg.render({canvasContext: x, viewport: vp}).promise; pg.cleanup(); return c;
+}
+async function exDocx(buf) {
+  if (!window.fflate) await loadScript(libUrl('fflate.min.js'));
+  let files; try { files = fflate.unzipSync(new Uint8Array(buf), {filter: f => f.name === 'word/document.xml'}); } catch (e) { throw new Error('arquivo .docx inválido ou corrompido'); }
+  const raw = files['word/document.xml']; if (!raw) throw new Error('não encontrei o texto do documento (word/document.xml)');
+  const doc = new DOMParser().parseFromString(fflate.strFromU8(raw), 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('documento Word ilegível');
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main', out = [];
+  const para = p => { let s = ''; const walk = n => { for (const c of n.childNodes) { if (c.nodeType !== 1) continue; const l = c.localName; if (l === 't') s += c.textContent; else if (l === 'tab') s += '\t'; else if (l === 'br' || l === 'cr') s += '\n'; else if (l !== 'delText' && l !== 'instrText' && l !== 'rPr' && l !== 'pPr') walk(c); } }; walk(p); return s; };
+  const block = n => { for (const c of n.childNodes) { if (c.nodeType !== 1) continue;
+    if (c.localName === 'p') out.push(para(c));
+    else if (c.localName === 'tbl') { for (const tr of c.getElementsByTagNameNS(W, 'tr')) out.push([...tr.getElementsByTagNameNS(W, 'tc')].map(tc => [...tc.getElementsByTagNameNS(W, 'p')].map(para).join(' ').trim()).filter(Boolean).join(' | ')); out.push(''); }
+    else if (c.localName !== 'sectPr') block(c); } };
+  block(doc.getElementsByTagNameNS(W, 'body')[0] || doc.documentElement);
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+function exDecodeText(buf) { try { return new TextDecoder('utf-8', {fatal: true}).decode(buf); } catch (e) { return new TextDecoder('windows-1252').decode(buf); } }
+const exKind = (name, u8) => u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46 ? 'pdf' : u8[0] === 0x50 && u8[1] === 0x4b ? 'docx' : u8[0] === 0xd0 && u8[1] === 0xcf && u8[2] === 0x11 && u8[3] === 0xe0 ? 'doc' : /\.(rtf)$/i.test(name) ? 'rtf' : 'txt';
+
+/* ---- painel de tela cheia (fecha sozinho ao travar o cofre: classe viewer) ---- */
+let EX_URLS = [];
+function exPanel(html, onMount) {
+  let d = $('#expanel'); const keep = d ? d.scrollTop : 0, same = d && d.dataset.k === String(EX_SEQ_PANEL);
+  if (!d) { d = document.createElement('div'); d.id = 'expanel'; d.className = 'viewer expanel'; document.body.appendChild(d); }
+  d.dataset.k = String(EX_SEQ_PANEL); d.innerHTML = html; onMount && onMount(d); micify(d); if (same) d.scrollTop = keep; return d;
+}
+let EX_SEQ_PANEL = 0;
+function exPanelClose() { const d = $('#expanel'); if (d) d.remove(); EX_URLS.forEach(u => URL.revokeObjectURL(u)); EX_URLS = []; EX_RUN = null; }
+const exUrl = blob => { const u = URL.createObjectURL(blob); EX_URLS.push(u); return u; };
+const exOpOptions = sel => S.ops.filter(o => !isArq(o) || o.id === sel).map(o => `<option value="${o.id}" ${o.id === sel ? 'selected' : ''}>${esc(o.nome)}</option>`).join('');
+const exDefOp = opId => (opId && getOp(opId) ? opId : (ctxOp && ctxOp()) || (activeOps()[0] || S.ops[0] || {}).id || '');
+
+/* ---- 1) Extrair de texto/documento: entrada ---- */
+function extractUI(opId, pre) {
+  // pre = {src, text}: reabre a tela com o arquivo já carregado (após o aviso de OCR / .doc, que usam a mesma folha)
+  const src = pre && pre.src || {name: '', kind: 'texto', hash: '', pages: 0};
+  sheet(`<h2 style="margin-top:0">🧾 Extrair de texto/documento</h2>
+    <div class="sub" style="margin:0 4px 8px;line-height:1.45">Cole o texto de um <b>BO, relatório ou mensagem</b> (WhatsApp) ou escolha um <b>PDF</b> ou <b>Word (.docx)</b>. O app procura nomes, CPF, RG, telefones, placas, nascimento, filiação, vulgo e endereços — <b>tudo no aparelho</b>.</div>
+    <label>Texto</label><textarea id="ex_t" style="min-height:170px" placeholder="Cole aqui o texto…"></textarea>
+    <div class="sub" id="ex_src" style="margin:6px 4px 0"></div>
+    <div class="btn" id="ex_file" style="margin-top:12px">📎 Escolher PDF, Word (.docx) ou .txt</div>
+    <div class="warn" style="margin-bottom:0">A extração é <b>automática</b> e pode errar ou deixar passar dados. Na próxima tela você confere tudo; <b>nenhum alvo é criado sem a sua revisão</b>.</div>
+    <div class="gap"></div><div class="btn pri" id="ex_go">Extrair e conferir</div>
+    <div class="credit">${esc(APP_NAME)} · <b>${esc(CREDIT)}</b></div>`, s => {
+    const ta = s.querySelector('#ex_t'), st = s.querySelector('#ex_src');
+    if (pre && pre.text != null) { ta.value = pre.text; exSrcInfo(st, src, pre.text); }
+    ta.oninput = () => { if (src.kind !== 'texto' && src.loaded !== ta.value) { src.edited = true; st.textContent = `📄 ${src.name} · texto editado depois de carregado`; } };
+    s.querySelector('#ex_file').onclick = () => pickFile('application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,text/plain,.txt,application/msword,.doc', f => exLoadFile(f, opId, src.kind === 'texto' ? ta.value : ''));
+    s.querySelector('#ex_go').onclick = async () => {
+      const t = ta.value; if (!t.trim()) return toast('Cole um texto ou escolha um arquivo');
+      if (src.kind === 'texto') { src.name = ''; src.hash = await sha256(t); }
+      const r = exCandidates(t); EX_SEQ_PANEL++;
+      closeSheet(); exReview({mode: 'text', cards: r.cards, loose: r.loose, src: Object.assign({}, src, {text: t}), opId: exDefOp(opId), newOp: '', keepNote: true});
+    };
+  });
+}
+function exSrcInfo(st, src, text) {
+  if (!st) return;
+  st.innerHTML = `📄 <b>${esc(src.name)}</b> · ${({pdf: 'PDF', 'pdf-ocr': 'PDF digitalizado (OCR)', docx: 'Word', txt: 'texto'})[src.kind] || ''}${src.pages ? ` · ${src.pages} página(s)` : ''} · ${text.length} caracteres${src.edited ? ' · editado' : ''}<br><span style="font-size:11px">SHA-256 ${esc(src.hash.slice(0, 24))}…</span>`;
+}
+/* lê o arquivo escolhido e reabre a tela de entrada com o texto (a folha pode ter sido usada por avisos/OCR no meio) */
+async function exLoadFile(f, opId, typed) {
+  const stEl = () => $('#ex_src'), say = t => { const st = stEl(); if (st) st.textContent = t; };
+  const back = msg => { extractUI(opId, typed ? {text: typed} : null); if (msg) setTimeout(() => say(msg), 0); };
+  say('⏳ Lendo ' + (f.name || 'arquivo') + '…');
+  try {
+    const buf = await f.arrayBuffer(), u8 = new Uint8Array(buf), kind = exKind(f.name || '', u8);
+    if (kind === 'doc') return sheet(`<h2 style="margin-top:0">📝 Word antigo (.doc)</h2><div class="warn">O formato <b>.doc</b> (Word 97–2003) não pode ser lido no aparelho. Abra o arquivo no Word, Pages ou Google Docs e <b>salve/exporte como .docx</b> (ou PDF), depois escolha de novo.</div><div class="btn pri" id="dc_ok">Entendi</div>`, s2 => s2.querySelector('#dc_ok').onclick = () => back(''));
+    if (kind === 'rtf') throw new Error('arquivo .rtf não suportado — salve como .docx ou PDF');
+    const src = {name: f.name || 'arquivo', hash: await sha256(buf), kind, pages: 0, edited: false};
+    let text = '';
+    if (kind === 'pdf') {
+      say('⏳ Abrindo o PDF (leitor carregado do app na 1ª vez)…');
+      const pdf = await exPdfOpen(buf); src.pages = pdf.numPages;
+      try {
+        text = (await exPdfText(pdf)).join('\n\n');
+        if (text.replace(/\s/g, '').length < 20 * pdf.numPages) { // sem camada de texto: digitalizado
+          if (!(await exAskOcr(pdf.numPages))) return back('📄 PDF sem texto selecionável — nada extraído');
+          text = await exPdfOcr(pdf, Math.min(pdf.numPages, 15)); src.kind = 'pdf-ocr';
+          if (text == null) return back(KEY ? 'Leitura cancelada' : '');
+        }
+      } finally { pdf.destroy(); }
+    } else if (kind === 'docx') text = await exDocx(buf);
+    else text = exDecodeText(buf);
+    if (!KEY) return;
+    src.loaded = text; extractUI(opId, {src, text});
+    if (!text.trim()) toast('Nenhum texto encontrado no arquivo');
+  } catch (e) { console.warn(e); if (!KEY) return; if (!$('#ex_t')) back(''); setTimeout(() => say('⚠️ ' + e.message), 0); toast('Erro ao ler: ' + e.message); }
+}
+function exAskOcr(n) {
+  return new Promise(res => sheet(`<h2 style="margin-top:0">📄 PDF digitalizado</h2><div class="sub" style="line-height:1.45">Este PDF <b>não tem texto selecionável</b> (parece uma imagem escaneada). Posso ler as páginas com o <b>OCR no aparelho</b> (o mesmo da leitura de documento) — ${n > 15 ? 'as <b>15 primeiras</b> de ' + n + ' páginas' : n + ' página(s)'}. Leva alguns segundos por página e o resultado costuma ter erros: confira.</div><div class="grid2" style="margin-top:16px"><div class="btn" id="ao_n">Agora não</div><div class="btn pri" id="ao_y">Ler com OCR</div></div>`, s => {
+    s.querySelector('#ao_n').onclick = () => { closeSheet(); res(false); }; s.querySelector('#ao_y').onclick = () => res(true); }));
+}
+async function exPdfOcr(pdf, n) {
+  let stop = false, cancelRes; const out = [], cancelP = new Promise(r => cancelRes = r);
+  const prog = ocrBusySheet('📄 Lendo páginas com OCR…'); const st = () => $('#oc_st');
+  $('#sheet').insertAdjacentHTML('beforeend', '<div class="btn" id="oc_cancel" style="margin-top:12px">Cancelar</div>'); $('#oc_cancel').onclick = () => { stop = true; cancelRes('cancel'); ocrStop(); };
+  for (let i = 1; i <= n && !stop; i++) {
+    if (!KEY) return null; resetIdle();
+    const pre = `Página ${i} de ${n} · `;
+    try { const c = await exPdfPageCanvas(pdf, i); const cv = ocrCanvas(c, {x: 0, y: 0, w: c.width, h: c.height}, 2200);
+      const d = await Promise.race([runOcr(cv, {tessedit_pageseg_mode: '3'}, m => { prog(m); if (st()) st().textContent = pre + ocrStepTxt(m); }), cancelP]); if (d === 'cancel') break; out.push(d.text.trim()); }
+    catch (e) { if (stop) break; console.warn(e); out.push(''); }
+  }
+  if (!KEY) return null; closeSheet(); if (stop && !out.some(Boolean)) { toast('Leitura cancelada'); return null; } if (stop) toast(`Leitura interrompida — ${out.length} de ${n} página(s) lida(s)`);
+  return out.join('\n\n');
+}
+
+/* ---- conferência (comum ao texto e aos documentos em lote) ---- */
+let EX_RUN = null;
+function exReview(R) {
+  EX_RUN = R; const cards = R.cards, q = (d, x) => d.querySelector(x);
+  const label = c => `Pessoa ${cards.indexOf(c) + 1}`;
+  const itemLbl = (k, v) => `${EX_ICON[k] || ''} ${esc(k === 'nasc' ? dateBR(v) : k === 'fil' ? v.replace(/\n/g, ' / ') : v)}`;
+  const moveSel = (where, k, idx, iid) => `<select class="exmv" data-w="${where}" data-k="${k}" data-x="${idx}" data-iid="${iid || ''}" aria-label="Mover"><option value="">Mover…</option>${cards.filter(c => c.id !== where).map(c => `<option value="${c.id}">→ ${esc(label(c))}${c.nome ? ': ' + esc(c.nome.slice(0, 24)) : ''}</option>`).join('')}${where === 'loose' ? '<option value="new">→ Nova pessoa</option>' : '<option value="loose">→ Dados soltos</option>'}<option value="del">✕ Remover</option></select>`;
+  const chips = c => [['tel', 'tels'], ['veic', 'veics'], ['end', 'ends']].flatMap(([k, f]) => c[f].map((v, i) => `<span class="chip c-gray exchip">${itemLbl(k, v)} <b class="exmvb">⇄</b>${moveSel(c.id, k, i)}</span>`)).join('');
+  const cardHtml = c => `<div class="card glass excard ${c.inc ? '' : 'off'}" data-c="${c.id}" style="cursor:default">
+    <div class="row"><label class="ocrl" style="margin:0"><input type="checkbox" class="ocrck exinc" ${c.inc ? 'checked' : ''}> <b style="color:var(--txt)">${label(c)}</b>${c.papel ? ` <span class="chip c-blue">${esc(c.papel)}</span>` : ''}</label>
+      <select class="exmenu" aria-label="Ações"><option value="">⋯</option>${cards.filter(x => x !== c).map(x => `<option value="m:${x.id}">Juntar com ${esc(label(x))}${x.nome ? ': ' + esc(x.nome.slice(0, 22)) : ''}</option>`).join('')}<option value="rm">Remover cartão</option></select></div>
+    ${c.img ? `<div class="exdoc"><div class="th docth" style="width:96px;aspect-ratio:1.5;flex-shrink:0"><img src="${c.img.url}"></div><div><div class="sub">🪪 ${esc(c.img.name || 'imagem')}</div><label class="ocrl" style="margin:6px 0 0"><input type="checkbox" class="ocrck exkimg" ${c.keepImg ? 'checked' : ''}> Guardar como foto do documento</label></div></div>` : ''}
+    <div class="exf"><label>Nome</label><input data-f="nome" value="${esc(c.nome)}" placeholder="obrigatório para criar"></div>
+    <div class="grid2"><div class="exf"><label>Vulgo</label><input data-f="apelido" value="${esc(c.apelido)}"></div><div class="exf"><label>Nascimento</label><input data-f="nasc" type="date" value="${esc(c.nasc)}"></div></div>
+    <div class="grid2"><div class="exf"><label>CPF</label><input data-f="cpf" inputmode="numeric" value="${esc(c.cpf)}"><div class="sub excpf">${exCpfSt(c.cpf)}</div></div><div class="exf"><label>RG</label><input data-f="rg" value="${esc(c.rg)}"></div></div>
+    <div class="exf"><label>Filiação</label><textarea data-f="fil" style="min-height:48px">${esc(c.fil)}</textarea></div>
+    ${chips(c) ? `<div class="chips" style="margin-top:10px">${chips(c)}</div>` : ''}
+    ${c.raw != null ? `<details class="ocrraw"><summary class="sub">Ver texto lido</summary><pre>${esc(c.raw || '(nada)')}</pre></details>` : ''}</div>`;
+  const nInc = cards.filter(c => c.inc).length, src = R.src || {};
+  exPanel(`<div class="exhead"><div class="back" id="ex_x" style="margin:0">‹ Cancelar</div><div class="sub">${R.mode === 'doc' ? '🪪 Documentos em lote' : '🧾 Extração'}</div></div>
+    <h1 style="margin-top:6px">Conferir ${R.mode === 'doc' ? 'leituras' : 'extração'}</h1>
+    <div class="warn">${R.mode === 'doc' ? 'Leitura <b>automática (OCR)</b>: pode trocar letras e números. Confira cada cartão com a imagem.' : 'Extração <b>automática</b>: pode juntar dados da pessoa errada, errar nomes ou deixar passar dados.'} Só os cartões marcados viram alvos, e <b>nada é salvo</b> até o último passo.</div>
+    <div class="sub" style="margin:0 4px 6px">${src.name ? `📄 <b>${esc(src.name)}</b>${src.pages ? ` · ${src.pages} pág.` : ''} · ` : R.mode === 'doc' ? `${cards.length} imagem(ns) · ` : '📋 Texto colado · '}${cards.length} pessoa(s) encontrada(s) · ${R.loose.length} dado(s) solto(s)</div>
+    <label>Operação de destino</label><select id="ex_op">${exOpOptions(R.opId)}<option value="__new" ${R.opId === '__new' ? 'selected' : ''}>➕ Nova operação…</option></select>
+    <div id="ex_nopw" class="${R.opId === '__new' ? '' : 'hidden'}"><label>Nome da nova operação</label><input id="ex_nop" value="${esc(R.newOp)}" placeholder="Ex.: Operação Aurora"></div>
+    <h2>Pessoas (${cards.length}) <span class="sub" style="font-weight:400">· ${nInc} marcada(s)</span></h2>
+    ${cards.length ? cards.map(cardHtml).join('') : '<div class="empty" style="padding:20px"><div>🔎</div>Nenhuma pessoa reconhecida. Use <b>+ Adicionar pessoa</b> e mova os dados soltos.</div>'}
+    <div class="btn" id="ex_add">＋ Adicionar pessoa</div>
+    <h2>Dados soltos (${R.loose.length})</h2>
+    <div class="sub" style="margin:0 4px 8px">Encontrados sem um nome por perto. Toque em <b>⇄</b> para mandar a uma pessoa.</div>
+    ${R.loose.length ? `<div class="chips" id="ex_loose">${R.loose.map((it, i) => `<span class="chip ${it.ok === false ? 'c-amb' : 'c-gray'} exchip">${itemLbl(it.k, it.v)}${it.k === 'cpf' && it.ok === false ? ' ⚠️' : ''} <b class="exmvb">⇄</b>${moveSel('loose', it.k, i, it.id)}</span>`).join('')}</div>` : '<div class="sub" style="margin:0 4px">Nenhum.</div>'}
+    <div class="tgrow card glass" style="cursor:default;margin-top:16px"><div>${R.mode === 'doc' ? '🗒️ Guardar o texto lido como anotação' : '🗒️ Guardar o texto de origem como anotação'}<div class="sub">criptografada, em cada alvo criado/completado${src.name ? ', com nome do arquivo e SHA-256' : ''}</div></div><div class="tg ${R.keepNote ? 'on' : ''}" id="ex_note"></div></div>
+    <div class="gap"></div><div class="btn pri" id="ex_next">Conferir duplicados →</div>
+    ${credit()}`, d => {
+    q(d, '#ex_x').onclick = async () => { d.style.display = 'none'; if (await confirmBox('Descartar esta conferência? Nada foi salvo.', 'Descartar', true)) exPanelClose(); else d.style.display = ''; };
+    q(d, '#ex_op').onchange = e => { R.opId = e.target.value; q(d, '#ex_nopw').classList.toggle('hidden', R.opId !== '__new'); };
+    q(d, '#ex_nop').oninput = e => R.newOp = e.target.value;
+    q(d, '#ex_note').onclick = e => { R.keepNote = !R.keepNote; e.target.classList.toggle('on', R.keepNote); };
+    d.querySelectorAll('.excard').forEach(el => {
+      const c = cards.find(x => x.id === el.dataset.c);
+      el.querySelectorAll('[data-f]').forEach(inp => inp.oninput = () => { c[inp.dataset.f] = inp.value; if (inp.dataset.f === 'cpf') el.querySelector('.excpf').innerHTML = exCpfSt(inp.value); });
+      q(el, '.exinc').onchange = e => { c.inc = e.target.checked; el.classList.toggle('off', !c.inc); };
+      const ki = q(el, '.exkimg'); if (ki) ki.onchange = e => c.keepImg = e.target.checked;
+      q(el, '.exmenu').onchange = e => { const v = e.target.value; e.target.value = '';
+        if (v === 'rm') { exDropCard(R, c); exReview(R); }
+        else if (v.startsWith('m:')) { const o = cards.find(x => x.id === v.slice(2)); if (o) { const msg = `🔗 ${label(c)} juntada em ${label(o)}`; exMergeCards(R, o, c); exReview(R); toast(msg); } } };
+    });
+    d.querySelectorAll('.exmv').forEach(sel => sel.onchange = () => {
+      const to = sel.value; if (!to) return; const w = sel.dataset.w, k = sel.dataset.k, x = +sel.dataset.x; let it;
+      if (w === 'loose') { it = R.loose.splice(x, 1)[0]; }
+      else { const c = cards.find(y => y.id === w), f = EX_LIST[k]; it = exItem(k, c[f].splice(x, 1)[0]); }
+      if (to === 'loose') R.loose.push(it);
+      else if (to === 'new') { const c = exCard({inc: true}); cards.push(c); exPut(c, it, R.loose); }
+      else if (to !== 'del') { const c = cards.find(y => y.id === to); if (c) { exPut(c, it, R.loose); c.inc = true; } }
+      exReview(R);
+    });
+    q(d, '#ex_add').onclick = () => { cards.push(exCard({inc: true})); exReview(R); setTimeout(() => { const el = d.querySelector('.excard:last-of-type input[data-f="nome"]'); if (el) { el.scrollIntoView({block: 'center'}); el.focus(); } }, 50); };
+    q(d, '#ex_next').onclick = () => {
+      const inc = cards.filter(c => c.inc); if (!inc.length) return toast('Marque pelo menos uma pessoa');
+      const semNome = inc.find(c => !c.nome.trim()); if (semNome) { toast(`${label(semNome)}: informe o nome ou desmarque`); d.querySelector(`.excard[data-c="${semNome.id}"] input[data-f="nome"]`).scrollIntoView({block: 'center'}); return; }
+      if (R.opId === '__new' && !R.newOp.trim()) return toast('Dê um nome à nova operação');
+      if (!R.opId) return toast('Escolha a operação');
+      EX_SEQ_PANEL++; exDupStep(R);
+    };
+  });
+}
+const exCpfSt = v => { const d = _digits(v); return !d ? '' : d.length !== 11 ? '<span style="color:#ffadad">⚠️ precisa de 11 dígitos</span>' : cpfValid(d) ? '<span style="color:#7be3b0">✓ dígitos conferem</span>' : '<span style="color:#ffadad">⚠️ dígitos não conferem</span>'; };
+function exMergeCards(R, into, from) {
+  ['nome', 'apelido', 'cpf', 'rg', 'nasc'].forEach(f => { if (from[f] && !into[f]) into[f] = from[f]; else if (from[f] && exKey(from[f]) !== exKey(into[f]) && f !== 'nome') R.loose.push(exItem(f === 'apelido' ? 'vulgo' : f, from[f])); });
+  if (from.fil) exPut(into, exItem('fil', from.fil), R.loose);
+  from.tels.forEach(v => exPut(into, exItem('tel', v), R.loose)); from.veics.forEach(v => exPut(into, exItem('veic', v), R.loose)); from.ends.forEach(v => exPut(into, exItem('end', v), R.loose));
+  if (!into.img && from.img) { into.img = from.img; into.keepImg = from.keepImg; } if (from.raw) into.raw = (into.raw ? into.raw + '\n\n---\n\n' : '') + from.raw;
+  if (!into.papel) into.papel = from.papel; into.inc = true; R.cards.splice(R.cards.indexOf(from), 1);
+}
+function exDropCard(R, c) { // dados de contato não somem: vão para os dados soltos
+  c.tels.forEach(v => R.loose.push(exItem('tel', v))); c.veics.forEach(v => R.loose.push(exItem('veic', v))); c.ends.forEach(v => R.loose.push(exItem('end', v)));
+  if (c.cpf) R.loose.push(exItem('cpf', c.cpf, cpfValid(c.cpf))); if (c.rg) R.loose.push(exItem('rg', c.rg));
+  R.cards.splice(R.cards.indexOf(c), 1);
+}
+/* duplicados: mesma operação + mesmo CPF/RG (documento) ou mesmo nome — igual à importação em lote */
+const exDocTokens = doc => (String(doc || '').match(/\d[\d.\-\/]*[\dXx]?/g) || []).map(x => _digits(x)).filter(x => x.length >= 5);
+function exFindDup(opId, c, skip) {
+  if (!opId || opId === '__new') return null; const cpf = _digits(c.cpf), rg = _digits(c.rg);
+  for (const a of S.alvos) { if (a.opId !== opId || (skip && skip.has(a.id))) continue; const tk = exDocTokens(a.doc);
+    if (cpf.length === 11 && (tk.includes(cpf) || _digits(a.doc) === cpf)) return {a, why: 'mesmo CPF'};
+    if (rg.length >= 5 && tk.includes(rg)) return {a, why: 'mesmo RG'}; }
+  for (const a of S.alvos) if (a.opId === opId && !(skip && skip.has(a.id)) && c.nome.trim() && exKey(a.nome) === exKey(c.nome)) return {a, why: 'mesmo nome'};
+  return null;
+}
+const exDocStr = c => { const d = _digits(c.cpf), cpf = d.length === 11 ? cpfFmt(d) : c.cpf.trim(), rg = c.rg.trim(); return cpf && rg ? `${cpf} / RG ${rg}` : cpf || (rg ? 'RG ' + rg : ''); };
+function exDupStep(R) {
+  const inc = R.cards.filter(c => c.inc);
+  inc.forEach(c => { const f = exFindDup(R.opId, c); if (!f) { c.dup = null; c.act = 'new'; return; } if (!c.dup || c.dup.a !== f.a) c.act = 'merge'; c.dup = f; });
+  // repetidos dentro da própria leitura
+  const seen = new Map(), inner = []; inc.forEach(c => { const k = _digits(c.cpf).length === 11 ? 'cpf' + _digits(c.cpf) : 'n' + exKey(c.nome); if (seen.has(k)) inner.push([seen.get(k), c]); else seen.set(k, c); });
+  const lbl = c => `Pessoa ${R.cards.indexOf(c) + 1}`;
+  const row = c => `<div class="card glass exdup" data-c="${c.id}" style="cursor:default"><div class="row"><div><div class="t">${c.dup ? '🔁' : '➕'} ${esc(c.nome)}</div><div class="sub">${esc(lbl(c))}${exDocStr(c) ? ' · ' + esc(exDocStr(c)) : ''}${c.tels.length ? ' · ' + c.tels.length + ' tel.' : ''}${c.img && c.keepImg ? ' · 🪪 imagem' : ''}</div></div></div>
+    ${c.dup ? `<div class="sub" style="margin:8px 0 6px;color:#ffcf8a">Já existe nesta operação: <b>${esc(c.dup.a.nome)}</b> (${c.dup.why})</div><select class="exact"><option value="merge" ${c.act === 'merge' ? 'selected' : ''}>Completar o existente (só campos vazios)</option><option value="new" ${c.act === 'new' ? 'selected' : ''}>Criar outro alvo mesmo assim</option><option value="skip" ${c.act === 'skip' ? 'selected' : ''}>Não importar</option></select>` : '<div class="sub" style="margin-top:6px">Novo alvo</div>'}</div>`;
+  const opName = R.opId === '__new' ? R.newOp.trim() + ' (nova)' : (getOp(R.opId) || {}).nome;
+  const counts = () => ({n: inc.filter(c => c.act === 'new').length, m: inc.filter(c => c.act === 'merge').length});
+  const k = counts();
+  exPanel(`<div class="exhead"><div class="back" id="ed_b" style="margin:0">‹ Voltar à conferência</div></div>
+    <h1 style="margin-top:6px">Duplicados</h1><div class="sub" style="margin:4px 4px 10px">Destino: <b>${esc(opName)}</b> · comparação por CPF/RG e nome dentro da operação</div>
+    ${inner.length ? `<div class="warn">⚠️ ${inner.map(([a, b]) => `${esc(lbl(a))} e ${esc(lbl(b))}`).join('; ')} parecem a mesma pessoa. Volte e use <b>⋯ → Juntar</b>, ou siga assim.</div>` : ''}
+    ${inc.map(row).join('')}
+    <div class="sub" style="margin:8px 4px;line-height:1.45">“Completar” preenche só os campos <b>vazios</b> do alvo existente e acrescenta telefones/placas novos; nada do que já existe é apagado ou trocado.</div>
+    <div class="gap"></div><div class="btn pri ${k.n + k.m ? '' : 'dis'}" id="ed_ok">Salvar: ${k.n} novo(s) · ${k.m} completado(s)</div>${credit()}`, d => {
+    d.querySelector('#ed_b').onclick = () => { EX_SEQ_PANEL++; exReview(R); };
+    d.querySelectorAll('.exdup').forEach(el => { const s = el.querySelector('.exact'); if (s) s.onchange = () => { R.cards.find(c => c.id === el.dataset.c).act = s.value; exDupStep(R); }; });
+    d.querySelector('#ed_ok').onclick = () => { const kk = counts(); if (!kk.n && !kk.m) return toast('Nada para salvar'); exSave(R); };
+  });
+}
+async function exSave(R) {
+  const btn = $('#ed_ok'); if (!btn || btn.dataset.busy) return; btn.dataset.busy = '1'; btn.textContent = 'Salvando e criptografando…';
+  try {
+    let opId = R.opId, newOp = false;
+    if (opId === '__new') { const ex = S.ops.find(o => exKey(o.nome) === exKey(R.newOp)); if (ex) opId = ex.id; else { opId = uid(); S.ops.push({id: opId, nome: R.newOp.trim(), status: 'planejada', desc: '', ts: Date.now(), audios: [], vig: [], diario: [], trajetos: []}); newOp = true; } }
+    const src = R.src || {}, now = Date.now(), how = R.mode === 'doc' ? 'leitura de documento em lote' : 'extração de texto/documento';
+    const noteTxt = c => { if (!R.keepNote) return '';
+      const body = R.mode === 'doc' ? (c.raw || '') : (src.text || ''); if (!body.trim()) return '';
+      const head = R.mode === 'doc' ? `🪪 Texto lido do documento (OCR automático)${c.img ? ' — imagem: ' + (c.img.name || '') + ' · SHA-256 do arquivo: ' + c.img.hashOrig : ''}` : `📄 Texto de origem (extração automática, revisada)${src.name ? ` — arquivo: ${src.name} · SHA-256 do arquivo: ${src.hash}${src.edited ? ' (texto editado depois de carregado)' : ''}` : ` — texto colado · SHA-256: ${src.hash}`}`;
+      const max = 8000; return head + '\n\n' + (body.length > max ? body.slice(0, max) + `\n\n[… texto truncado: ${body.length} caracteres no total — o SHA-256 acima é do original]` : body); };
+    const putDoc = async (a, c) => { if (!c.img || !c.keepImg) return false; if (a.docFoto) return false; const id = uid(); await putImg(id, new Uint8Array(c.img.bytes)); a.docFoto = {id, ts: Date.now(), hash: await sha256(c.img.bytes), hashOrig: c.img.hashOrig, arquivo: c.img.name || ''}; return true; };
+    let nNew = 0, nMerge = 0;
+    for (const c of R.cards.filter(c => c.inc)) {
+      if (!KEY) return;
+      const doc = exDocStr(c), fil = c.fil.trim(), veic = c.veics.join('; '), end = c.ends.join(' / ');
+      const tels = []; c.tels.forEach(t => { if (!tels.some(x => telKey(x) === telKey(t))) tels.push(t); });
+      if (c.act === 'merge' && c.dup && S.alvos.includes(c.dup.a)) {
+        const a = c.dup.a, done = [];
+        [['apelido', c.apelido.trim(), 'vulgo'], ['doc', doc, 'documento'], ['nasc', c.nasc, 'nascimento'], ['filiacao', fil, 'filiação'], ['veic', veic, 'veículo'], ['end', end, 'endereço']].forEach(([f, v, l]) => { if (v && !String(a[f] || '').trim()) { a[f] = v; done.push(l); } });
+        if (String(a.veic || '').trim() && c.veics.length) { const have = new Set(platesIn(a.veic)), nv = c.veics.filter(v => { const pl = platesIn(v)[0]; return pl && !have.has(pl); }); if (nv.length) { a.veic = a.veic.trim() + '; ' + nv.join('; '); done.push(nv.length + ' veículo(s)/placa(s)'); } }
+        a.tels = a.tels || []; const nt = tels.filter(t => !a.tels.some(x => telKey(x) === telKey(t))); if (nt.length) { a.tels.push(...nt); done.push(nt.length + ' telefone(s)'); }
+        if (c.papel && !(a.tags || []).some(t => exKey(t) === exKey(c.papel))) { a.tags = a.tags || []; a.tags.push(c.papel); }
+        if (await putDoc(a, c)) done.push('foto do documento');
+        const nt2 = noteTxt(c); if (nt2) { a.notas = a.notas || []; a.notas.push({id: uid(), ts: now, txt: nt2}); }
+        a.log = a.log || []; a.log.push({ts: now, t: `Completado por ${how}${done.length ? ': ' + done.join(', ') : ' (nenhum campo vazio a preencher)'}`}); nMerge++;
+      } else if (c.act === 'new' || !c.dup) {
+        const a = {id: uid(), opId, nome: c.nome.trim(), apelido: c.apelido.trim(), doc, nasc: c.nasc, filiacao: fil, prio: 'media', tels, veic, end, vinc: '', situacao: '', situacaoOutro: '', redes: [], mandados: [], tags: c.papel ? [c.papel] : [], fotos: [], locais: [], notas: [], audios: [], pend: [], log: [{ts: now, t: `Cadastrado por ${how} (conferido)`}], ts: now};
+        S.alvos.push(a); if (await putDoc(a, c)) a.log.push({ts: now, t: 'Foto do documento registrada (leitura em lote)'});
+        const nt2 = noteTxt(c); if (nt2) a.notas.push({id: uid(), ts: now, txt: nt2}); nNew++;
+      }
+    }
+    await save(); exPanelClose(); location.hash = '#op/' + opId; route();
+    toast(`✔ ${nNew} alvo(s) criado(s)${nMerge ? ` · ${nMerge} completado(s)` : ''}${newOp ? ' · nova operação' : ''}`, 3500);
+  } catch (e) { console.error(e); toast('Erro ao salvar: ' + e.message); if (btn) { delete btn.dataset.busy; btn.textContent = 'Tentar de novo'; } }
+}
+const telKey = t => { const n = telNorm(t); return n ? n.l8 : _digits(t); };
+
+/* ---- 2) Fotos em lote pelo nome do arquivo ---- */
+const exSlug = s => _norm(s).replace(/[^a-z0-9]+/g, '');
+function exFileKeys(name) {
+  const b0 = String(name || '').replace(/\.[A-Za-z0-9]{2,5}$/, '').trim(), b1 = b0.replace(/(?:[\s_\-.]*\(\d{1,3}\)|[\s_\-.]+\d{1,2})$/, '');
+  return [...new Set([b0, b1])].filter(Boolean).map(b => ({digits: _digits(b), letters: exSlug(b).replace(/\d+/g, '')}));
+}
+function exAlvoKeys(a) {
+  const d = new Set(exDocTokens(a.doc)); const ad = _digits(a.doc); if (ad.length >= 5) d.add(ad);
+  const parts = _norm(a.nome).split(/[^a-z0-9]+/).filter(Boolean), np = parts.filter(w => !PART.has(w)), names = new Set([parts.join(''), np.join('')]);
+  if (np.length >= 2) names.add(np[0] + np[np.length - 1]);
+  return {d, names, vul: a.apelido && exSlug(a.apelido).length >= 3 ? exSlug(a.apelido) : ''};
+}
+function exMatchFile(name, alvos) {
+  const keys = exFileKeys(name), K = alvos.map(a => [a, exAlvoKeys(a)]);
+  for (const k of keys) if (k.digits.length >= 5) { const hit = K.filter(([, x]) => x.d.has(k.digits)).map(([a]) => a); if (hit.length) return {alvos: [...new Set(hit)], why: k.digits.length === 11 && cpfValid(k.digits) ? 'CPF' : 'documento'}; }
+  for (const k of keys) if (k.letters.length >= 4) {
+    const hn = K.filter(([, x]) => x.names.has(k.letters)).map(([a]) => a); if (hn.length) return {alvos: hn, why: 'nome'};
+    const hv = K.filter(([, x]) => x.vul && x.vul === k.letters).map(([a]) => a); if (hv.length) return {alvos: hv, why: 'vulgo'};
+  }
+  return null;
+}
+function photoBatchUI(opId) {
+  pickFile('image/*', files => {
+    files = files.filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|heic|heif|webp|gif)$/i.test(f.name));
+    if (!files.length) return toast('Nenhuma imagem escolhida');
+    EX_SEQ_PANEL++; const P = {files: files.map(f => ({f, url: exUrl(f), sel: '', why: '', amb: 0})), scope: opId && getOp(opId) ? opId : '', capa: true, stamp: !!S.cfg.carimbo};
+    exPhotoMatch(P); exPhotoReview(P);
+  }, true);
+}
+function exPhotoMatch(P) {
+  const alvos = S.alvos.filter(a => P.scope ? a.opId === P.scope : !isArq(getOp(a.opId)));
+  P.files.forEach(r => { const m = exMatchFile(r.f.name, alvos); r.why = m ? m.why : ''; r.amb = m && m.alvos.length > 1 ? m.alvos.length : 0; r.cands = m ? m.alvos.map(a => a.id) : []; r.sel = m && m.alvos.length === 1 ? m.alvos[0].id : ''; });
+}
+function exPhotoReview(P) {
+  const alvos = S.alvos.filter(a => P.scope ? a.opId === P.scope : !isArq(getOp(a.opId))).slice().sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
+  const opt = r => `<option value="">— não importar —</option>${r.cands.length > 1 ? `<optgroup label="Possíveis (${r.why})">${r.cands.map(id => getAlvo(id)).filter(Boolean).map(a => `<option value="${a.id}" ${r.sel === a.id ? 'selected' : ''}>${esc(a.nome)} · ${esc((getOp(a.opId) || {}).nome || '')}</option>`).join('')}</optgroup>` : ''}<optgroup label="Alvos">${alvos.map(a => `<option value="${a.id}" ${r.sel === a.id && r.cands.length <= 1 ? 'selected' : ''}>${esc(a.nome)}${P.scope ? '' : ' · ' + esc((getOp(a.opId) || {}).nome || '')}</option>`).join('')}</optgroup>`;
+  const row = (r, i) => `<div class="exprow glass" data-i="${i}"><div class="th" style="width:56px;height:56px;flex-shrink:0"><img src="${r.url}" loading="lazy"></div><div style="flex:1;min-width:0"><div class="exfn">${esc(r.f.name)}</div><div class="sub">${r.amb ? `⚠️ ${r.amb} alvos possíveis (${esc(r.why)}) — escolha` : r.why ? `✓ pelo ${esc(r.why)}` : 'sem correspondência'}</div><select class="exps">${opt(r)}</select></div></div>`;
+  const matched = P.files.map((r, i) => [r, i]).filter(([r]) => r.why), un = P.files.map((r, i) => [r, i]).filter(([r]) => !r.why), nImp = P.files.filter(r => r.sel).length;
+  exPanel(`<div class="exhead"><div class="back" id="pb_x" style="margin:0">‹ Cancelar</div><div class="sub">🖼️ Fotos pelo nome</div></div>
+    <h1 style="margin-top:6px">Fotos em lote</h1><div class="sub" style="margin:4px 4px 10px;line-height:1.45">${P.files.length} foto(s). O nome do arquivo (sem extensão, sem acento/espaço/separador) foi comparado com <b>CPF, RG/documento, nome e vulgo</b> dos alvos. Ex.: <span class="kbd">52998224725_2.jpg</span>, <span class="kbd">joao-carlos-da-silva.jpg</span>.</div>
+    <label>Procurar alvos em</label><select id="pb_sc"><option value="">Todas as operações (ativas)</option>${exOpOptions(P.scope)}</select>
+    <h2>Com correspondência (${matched.length})</h2>${matched.length ? matched.map(([r, i]) => row(r, i)).join('') : '<div class="sub" style="margin:0 4px">Nenhuma.</div>'}
+    <h2>Sem correspondência (${un.length})</h2>${un.length ? `<div class="sub" style="margin:0 4px 8px">Escolha o alvo manualmente ou deixe “não importar”.</div>` + un.map(([r, i]) => row(r, i)).join('') : '<div class="sub" style="margin:0 4px">Nenhuma.</div>'}
+    <div class="card glass" style="cursor:default;padding:0;margin-top:14px"><div class="tgrow"><div>⭐ 1ª foto vira capa<div class="sub">só para alvos sem capa escolhida</div></div><div class="tg ${P.capa ? 'on' : ''}" id="pb_capa"></div></div>
+      <div class="tgrow"><div>🕓 Carimbo<div class="sub">cópia com data/GPS da própria foto</div></div><div class="tg ${P.stamp ? 'on' : ''}" id="pb_st"></div></div></div>
+    <div class="sub" style="margin:8px 4px;line-height:1.4">Entram como fotos do <b>álbum</b>: data e GPS do EXIF, SHA-256 do arquivo original, criptografadas.</div>
+    <div class="gap"></div><div class="btn pri ${nImp ? '' : 'dis'}" id="pb_ok">${nImp ? `Importar ${nImp} foto(s)` : 'Nenhuma foto atribuída'}</div>${credit()}`, d => {
+    d.querySelector('#pb_x').onclick = exPanelClose;
+    d.querySelector('#pb_sc').onchange = e => { P.scope = e.target.value; exPhotoMatch(P); exPhotoReview(P); };
+    d.querySelector('#pb_capa').onclick = e => { P.capa = !P.capa; e.target.classList.toggle('on', P.capa); };
+    d.querySelector('#pb_st').onclick = e => { P.stamp = !P.stamp; e.target.classList.toggle('on', P.stamp); };
+    d.querySelectorAll('.exprow').forEach(el => { el.querySelector('.exps').onchange = e => { P.files[+el.dataset.i].sel = e.target.value; const n = P.files.filter(r => r.sel).length, b = d.querySelector('#pb_ok'); b.textContent = n ? `Importar ${n} foto(s)` : 'Nenhuma foto atribuída'; b.classList.toggle('dis', !n); }; });
+    d.querySelector('#pb_ok').onclick = () => { if (!P.files.some(r => r.sel)) return toast('Escolha o alvo de pelo menos uma foto'); exPhotoSave(P); };
+  });
+}
+async function exPhotoSave(P) {
+  const rows = P.files.filter(r => r.sel && getAlvo(r.sel)); let ok = 0, fail = 0; const capaSet = new Set(), touched = new Map(); let stop = false;
+  sheet(`<h2 style="margin-top:0">🖼️ Importando fotos…</h2><div class="sub" id="pbs_st">Preparando…</div><div class="prog"><i id="pbs_bar"></i></div><div class="btn" id="pbs_c" style="margin-top:12px">Parar</div>`, s => s.querySelector('#pbs_c').onclick = () => { stop = true; });
+  for (let i = 0; i < rows.length && !stop; i++) {
+    if (!KEY) return; resetIdle(); const r = rows[i], a = getAlvo(r.sel);
+    const st = $('#pbs_st'), bar = $('#pbs_bar'); if (st) st.textContent = `${i + 1} de ${rows.length} · ${r.f.name}`; if (bar) bar.style.width = Math.round(i / rows.length * 100) + '%';
+    try {
+      const orig = await r.f.arrayBuffer(), ex = parseExif(orig), hash = await sha256(orig), bytes = await resizeJpeg(r.f), fid = uid(), now = Date.now();
+      await putImg(fid, new Uint8Array(bytes));
+      const f = {id: fid, ts: ex.ts || now, importado: now, dataExif: !!ex.ts, hash, hashTipo: 'original', legenda: '', origem: 'album', arquivo: r.f.name || '', lote: 'nome'};
+      if (ex.lat != null) Object.assign(f, {lat: ex.lat, lng: ex.lng, acc: null}); if (ex.orientation) f.orient = ex.orientation;
+      if (P.stamp) f.carimbo = await makeStamp(a, bytes, f.ts, f.lat != null ? f : null, ex.ts ? '' : ' (importação — foto sem data)');
+      if (P.capa && !capaSet.has(a.id) && !(a.capa && (a.fotos || []).some(x => x.id === a.capa))) { a.capa = fid; capaSet.add(a.id); }
+      a.fotos = a.fotos || []; a.fotos.push(f); touched.set(a.id, (touched.get(a.id) || 0) + 1); ok++;
+    } catch (e) { console.warn('foto em lote', e); fail++; }
+  }
+  touched.forEach((n, id) => { const a = getAlvo(id); a.log = a.log || []; a.log.push({ts: Date.now(), t: `${n} foto(s) importada(s) em lote pelo nome do arquivo${capaSet.has(id) ? ' · capa definida' : ''}`}); });
+  if (ok) await save(); closeSheet(); exPanelClose(); route();
+  toast(`🖼️ ${ok} foto(s) em ${touched.size} alvo(s)${fail ? ` · ⚠️ ${fail} falha(s)` : ''}${stop ? ' · interrompido' : ''}`, 3500);
+}
+
+/* ---- 3) Leitura de documentos em lote (OCR sequencial, um único leitor) ---- */
+let DOCQ = null;
+function docBatchUI(opId) {
+  if (!DOCQ || (opId && DOCQ.opId !== opId)) { if (DOCQ) DOCQ.files.forEach(x => URL.revokeObjectURL(x.url)); DOCQ = {opId: opId || '', files: []}; }
+  const Q = DOCQ, n = Q.files.length;
+  sheet(`<h2 style="margin-top:0">🪪 Ler documentos em lote</h2>
+    <div class="sub" style="margin:0 4px 10px;line-height:1.45">Fotografe ou escolha várias imagens de <b>RG/CNH</b>. Cada uma é lida no aparelho (OCR, uma por vez) e vira um cartão para conferir — nome, CPF (com verificação), RG, nascimento e filiação. A imagem pode virar a 🪪 foto do documento do alvo.</div>
+    ${n ? `<div class="thumbs" id="dq_th">${Q.files.map((x, i) => `<div class="th" data-i="${i}"><img src="${x.url}"><span class="g">✕</span></div>`).join('')}</div>` : '<div class="empty" style="padding:16px"><div>🪪</div>Nenhuma imagem na fila.</div>'}
+    <div class="grid2" style="margin-top:12px"><div class="btn" id="dq_cam">📷 Fotografar</div><div class="btn" id="dq_alb">🖼️ Escolher várias</div></div>
+    <div class="sub" style="margin:8px 4px 0">Boa luz, documento plano e sem reflexo. Toque numa miniatura para tirar da fila.</div>
+    <div class="gap"></div><div class="btn pri ${n ? '' : 'dis'}" id="dq_go">${n ? `Ler ${n} documento(s)` : 'Adicione imagens'}</div>`, s => {
+    s.querySelectorAll('#dq_th .th').forEach(t => t.onclick = () => { const x = Q.files.splice(+t.dataset.i, 1)[0]; URL.revokeObjectURL(x.url); docBatchUI(Q.opId); });
+    const add = fs => { fs.forEach(f => Q.files.push({f, url: URL.createObjectURL(f)})); docBatchUI(Q.opId); };
+    s.querySelector('#dq_cam').onclick = () => { const inp = $('#cam'); inp.value = ''; hold(180000); inp.oncancel = () => release(); inp.onchange = () => { release(); const f = inp.files[0]; if (f) add([f]); }; inp.click(); };
+    s.querySelector('#dq_alb').onclick = () => pickFile('image/*', fs => add(fs), true);
+    s.querySelector('#dq_go').onclick = () => { if (!Q.files.length) return toast('Adicione imagens dos documentos'); const fs = Q.files.map(x => x.f); Q.files.forEach(x => URL.revokeObjectURL(x.url)); DOCQ = null; docBatchRun(fs, Q.opId); };
+  });
+}
+async function docBatchRun(files, opId, cards = [], start = 0) {
+  // Cancelar pausa a fila: dá para continuar de onde parou (mesmo leitor recriado) ou conferir o que já foi lido
+  const n = files.length; let cancel = false, cancelRes, next = start; const cancelP = new Promise(r => cancelRes = r);
+  sheet(`<h2 style="margin-top:0">🪪 Lendo documentos…</h2><div class="t" id="db_n" style="margin:0 4px">Documento ${start + 1} de ${n}</div><div class="sub" id="db_st" style="margin:4px 4px 0">Preparando…</div><div class="prog"><i id="db_bar" style="width:${Math.round(start / n * 100)}%"></i></div>
+    <div class="sub" id="db_done" style="margin:6px 4px 0">${cards.length} lido(s) até agora</div>
+    <div class="sub" style="margin-top:8px;line-height:1.4">🔒 Leitura no próprio aparelho, uma imagem por vez — nada é enviado. Na 1ª vez, o leitor (~6 MB) é carregado do endereço do app.</div><div class="btn" id="db_c" style="margin-top:12px">Cancelar</div>`, s => s.querySelector('#db_c').onclick = () => { cancel = true; cancelRes('cancel'); ocrStop(); });
+  for (let i = start; i < n && !cancel; i++) {
+    if (!KEY) return; resetIdle(); const file = files[i]; let li = null; next = i;
+    const nEl = $('#db_n'), sEl = $('#db_st'); if (nEl) nEl.textContent = `Documento ${i + 1} de ${n}`; if (sEl) sEl.textContent = 'Preparando…';
+    const prog = m => { if (cancel) return; const st = $('#db_st'), bar = $('#db_bar'); if (st) st.textContent = ocrStepTxt(m) + (m.status === 'recognizing text' ? ` ${Math.round((m.progress || 0) * 100)}%` : ''); if (bar) bar.style.width = Math.round(((i + (m.status === 'recognizing text' ? .3 + .7 * (m.progress || 0) : .3 * (m.progress || 0))) / n) * 100) + '%'; };
+    try {
+      li = await loadImg(file); if (cancel) break; const cv = ocrCanvas(li.img, null, 2000);
+      let data = await Promise.race([runOcr(cv, {tessedit_pageseg_mode: '3'}, prog), cancelP]); if (data === 'cancel') break;
+      let ex = extractDoc(data.text);
+      if (!ex.nome && !ex.cpfs.length) { const d2 = await Promise.race([runOcr(cv, {tessedit_pageseg_mode: '11'}, prog), cancelP]); if (d2 === 'cancel') break; const e2 = extractDoc(d2.text); if (e2.nome || e2.cpfs.length) { data = d2; ex = e2; } }
+      if (cancel) break;
+      const orig = await file.arrayBuffer(), bytes = await resizeJpeg(file, 2000), best = ex.cpfs[0];
+      cards.push(exCard({nome: ex.nome, cpf: best ? cpfFmt(best.d) : '', rg: ex.rg, nasc: ex.nasc, fil: ex.filiacao.join('\n'), inc: !!(ex.nome || (best && best.ok)), raw: data.text, keepImg: true,
+        img: {bytes, url: exUrl(new Blob([bytes], {type: 'image/jpeg'})), name: file.name || `documento_${i + 1}.jpg`, hashOrig: await sha256(orig)}}));
+      next = i + 1;
+    } catch (e) { if (cancel) break; console.warn('doc lote', e); try { const bytes = await resizeJpeg(file, 2000); cards.push(exCard({inc: false, raw: '(falha na leitura: ' + e.message + ')', keepImg: true, img: {bytes, url: exUrl(new Blob([bytes], {type: 'image/jpeg'})), name: file.name || '', hashOrig: await sha256(await file.arrayBuffer())}})); } catch (e2) {} next = i + 1; }
+    finally { if (li) URL.revokeObjectURL(li.u); }
+    const dn = $('#db_done'); if (dn) dn.textContent = `${cards.length} lido(s) até agora`;
+  }
+  if (!KEY) return;
+  if (cancel && next < n) { // pausado: continuar ou conferir
+    const rest = n - next;
+    return sheet(`<h2 style="margin-top:0">⏸️ Leitura pausada</h2><div class="sub" style="line-height:1.45">${cards.length} de ${n} documento(s) lido(s). Faltam <b>${rest}</b>.</div>
+      <div class="btn pri" id="dp_go" style="margin-top:16px">▶️ Continuar a leitura (${rest} restante${rest > 1 ? 's' : ''})</div>
+      <div class="btn ${cards.length ? '' : 'dis'}" id="dp_rev" style="margin-top:10px">Conferir os ${cards.length} lido(s)${rest ? ' e descartar o resto' : ''}</div>
+      <div class="btn dan" id="dp_x" style="margin-top:10px">Descartar tudo</div>`, s => {
+      s.querySelector('#dp_go').onclick = () => docBatchRun(files, opId, cards, next);
+      s.querySelector('#dp_rev').onclick = () => { if (!cards.length) return toast('Nenhum documento lido ainda'); closeSheet(); EX_SEQ_PANEL++; exReview({mode: 'doc', cards, loose: [], src: {}, opId: exDefOp(opId), newOp: '', keepNote: false}); };
+      s.querySelector('#dp_x').onclick = () => { closeSheet(); EX_URLS.forEach(u => URL.revokeObjectURL(u)); EX_URLS = []; toast('Leitura descartada'); };
+    });
+  }
+  closeSheet();
+  if (!cards.length) return toast('Nenhum documento pôde ser lido');
+  EX_SEQ_PANEL++; exReview({mode: 'doc', cards, loose: [], src: {}, opId: exDefOp(opId), newOp: '', keepNote: false});
+}
+/* menu com os modos de importação (usado na Importação em lote) */
+const exModesHtml = () => `<div class="card glass" style="cursor:default;padding:0;margin:0 0 6px"><div class="tgrow" id="mo_ex" style="cursor:pointer"><div>🧾 Extrair de texto/documento<div class="sub">BO, relatório, WhatsApp, PDF ou Word → pessoas para conferir</div></div><span class="sub">›</span></div><div class="tgrow" id="mo_doc" style="cursor:pointer"><div>🪪 Ler documentos em lote<div class="sub">várias fotos de RG/CNH (OCR no aparelho)</div></div><span class="sub">›</span></div><div class="tgrow" id="mo_ph" style="cursor:pointer"><div>🖼️ Fotos em lote pelo nome<div class="sub">arquivos com CPF ou nome do alvo</div></div><span class="sub">›</span></div></div>`;
+function exModesBind(root, opId) { const b = (id, fn) => { const el = root.querySelector(id); if (el) el.onclick = fn; };
+  b('#mo_ex', () => extractUI(opId)); b('#mo_doc', () => { closeSheet(); docBatchUI(opId); }); b('#mo_ph', () => { closeSheet(); photoBatchUI(opId); }); }
 
 /* ---------- Início ---------- */
 DB.open().then(route).catch(e => { APP.innerHTML = `<div class="empty">Erro ao abrir o armazenamento: ${esc(e.message)}</div>`; });
