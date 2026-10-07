@@ -1,6 +1,6 @@
 # OpsVault Mobile
 
-Cofre de operações criptografado (PWA) — **by @aiforge.team** · versão **v0.7**
+Cofre de operações criptografado (PWA) — **by @aiforge.team** · versão **v0.8**
 
 Os dados ficam somente no aparelho, criptografados com AES-256 (chave derivada do PIN por PBKDF2). Nenhum dado é enviado a servidor. Funciona offline e pode ser instalado na tela inicial (iPhone/Safari e Android/Chrome).
 
@@ -29,6 +29,10 @@ Os dados ficam somente no aparelho, criptografados com AES-256 (chave derivada d
 - **Régua** (v0.6) para medir distâncias no mapa.
 - **Trajeto gravado** (v0.6) por GPS, com distância e duração, no mapa, no diário e no relatório.
 - **Cruzamentos de telefones e placas** (v0.6): avisa quando o mesmo telefone (8 últimos dígitos + DDD, com ou sem 9/+55/operadora) ou a mesma placa (antiga = Mercosul) aparece em alvos diferentes ou no diário de vigilância; alertas na ficha, tela Cruzamentos (com arquivadas opcionais) e seção no relatório PDF.
+- **Formato ordenado com IA** (v0.8): na tela de extração, copie uma instrução pronta, cole numa IA (de preferência institucional) junto com o texto, foto ou PDF e cole a resposta; no formato `CAMPO: valor` (linhas com `|`, blocos ou JSON) o app lê cada campo **exatamente**, com selo “Formato ordenado reconhecido”, avisos de CPF inválido e “(incerto)”, redes sociais e observações.
+- **Texto “Campo: valor” em qualquer ordem** (v0.8): rótulos como `Nome:`, `CPF:`, `RG:`, `Mãe:`, `Pai:`, `Endereço:`, `Placa:`, `Telefone:` são reconhecidos em qualquer ordem e têm prioridade sobre a adivinhação no texto livre.
+- **Ler CNH por modelo, com moldura** (v0.8): câmera traseira ao vivo com moldura na proporção da CNH (ou foto do álbum), ajuste dos 4 cantos e endireitamento, OCR **campo a campo** nas posições do modelo (nome, doc. identidade/órgão/UF, CPF, nascimento, filiação, nº registro, validade, categoria) com filtro de caracteres e **% de confiança** por campo; reserva com leitura da página inteira; também em “Ler documentos em lote”. Posições estimadas do layout oficial — sempre conferir.
+- **CNH digital em PDF** (v0.8): PDF exportado da Carteira Digital de Trânsito/gov.br é reconhecido pelos rótulos da camada de texto e lido pela posição de cada rótulo (selo “CNH digital reconhecida”); PDF digitalizado pode ser lido pela moldura da CNH. Tudo passa pela conferência antes de criar alvos.
 - **Extrair alvos de texto, PDF e Word** (v0.7): cole um BO, relatório ou mensagem de WhatsApp, ou escolha um PDF (com texto ou digitalizado, via OCR), Word `.docx` ou `.txt`; o app encontra nomes, vulgo, CPF (com verificação), RG, nascimento, filiação, telefones, placas e endereços e monta pessoas para **conferir** (editar, mover dados, juntar, duplicados por CPF/RG/nome) antes de criar ou completar alvos. Texto de origem opcional como anotação, com SHA-256.
 - **Fotos em lote pelo nome do arquivo** (v0.7): várias fotos de uma vez, ligadas ao alvo pelo CPF/RG (`52998224725_2.jpg`, `529.982.247-25.jpg`), nome ou vulgo no nome do arquivo; tabela de conferência (trocar alvo ou não importar), data/GPS do EXIF, SHA-256 do original, capa e carimbo opcionais.
 - **Leitura de documentos em lote** (v0.7): várias fotos de RG/CNH lidas uma a uma no aparelho (OCR), com progresso e Cancelar/Continuar; cartões com nome, CPF, RG, nascimento e filiação para conferir, juntar e checar duplicados; a imagem vira a foto do documento do alvo (criptografada, com SHA-256).

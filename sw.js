@@ -1,4 +1,4 @@
-const C = 'opsvault-v8', TILES = 'opsvault-tiles', OCR = 'opsvault-ocr-t7', LIBS = 'opsvault-lib-t1', TILE_MAX = 3000, TTL = 7 * 864e5;
+const C = 'opsvault-v9', TILES = 'opsvault-tiles', OCR = 'opsvault-ocr-t7', LIBS = 'opsvault-lib-t1', TILE_MAX = 3000, TTL = 7 * 864e5;
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'lib/leaflet.js', 'lib/leaflet.css', 'lib/jspdf.umd.min.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(FILES))); self.skipWaiting(); });
 // o cache de blocos do mapa (TILES), o do OCR e o dos leitores de PDF/Word (LIBS — arquivos baixados só no 1º uso) sobrevivem às trocas de versão do app

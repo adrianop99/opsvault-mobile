@@ -241,3 +241,22 @@ details.optl[open]{padding-bottom:6px}
 .exprow{display:flex;gap:12px;align-items:center;padding:10px;border-radius:16px;margin-bottom:8px}
 .exprow .exfn{font-size:13px;font-weight:600;word-break:break-all}
 .exprow select{margin-top:6px;padding:8px 10px;font-size:14px}
+/* v0.8 — formato ordenado (IA) */
+.exok{padding:10px 14px;border-radius:16px;font-size:13px;color:#7be3b0;background:rgba(40,200,130,.09);border:1px solid rgba(60,220,150,.3);margin:8px 0}
+.exok .sub{margin-top:2px}
+.exok.none{color:#ffcf8a;background:rgba(255,170,60,.08);border-color:rgba(255,170,60,.25)}
+.exwarn{font-size:12.5px;color:#ffcf8a;background:rgba(255,170,60,.08);border:1px solid rgba(255,170,60,.25);border-radius:12px;padding:7px 10px;margin:10px 0 0;line-height:1.4}
+.exwarn.hidden{display:none}
+.exai .t{font-weight:700}
+.exprompt{white-space:pre-wrap;word-break:break-word;font-size:11.5px;line-height:1.45;max-height:300px;overflow:auto;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px;margin:10px 0 0;-webkit-user-select:text;user-select:text}
+/* v0.8 — CNH por modelo */
+.confchip{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:4px;vertical-align:1px}
+.confchip.hi{background:rgba(40,200,130,.15);color:#7be3b0}.confchip.md{background:rgba(255,170,60,.14);color:#ffcf8a}.confchip.lo{background:rgba(255,90,90,.14);color:#ffadad}
+.cnhwrap{position:relative;margin:0 auto;touch-action:none;user-select:none;-webkit-user-select:none;border-radius:10px;overflow:visible}
+.cnhwrap canvas{display:block;border-radius:10px}
+.cnhh{position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:rgba(90,140,255,.35);border:2px solid #9cbcff;box-shadow:0 0 0 4px rgba(0,0,0,.25);touch-action:none}
+.cnhcam{position:relative;width:100%;aspect-ratio:3/4;max-height:56vh;margin:0 auto;background:#000;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.cnhcam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cnhframe{position:relative;width:86%;border:3px solid rgba(123,227,176,.95);border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,.45)}
+.cnhframe::after{content:'CNH';position:absolute;left:10px;top:6px;font-size:11px;font-weight:700;color:#7be3b0;letter-spacing:.1em}
+.ocrbar{flex-wrap:wrap;gap:8px}

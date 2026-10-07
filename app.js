@@ -1,6 +1,6 @@
 'use strict';
 /* ============ OpsVault Mobile — by @aiforge.team ============ */
-const APP_NAME = "OpsVault Mobile", APP_SHORT = "OpsVault", CREDIT = "by @aiforge.team", APP_VER = "v0.7", APP_CACHE = "opsvault-v8"; // APP_CACHE = nome do cache em sw.js
+const APP_NAME = "OpsVault Mobile", APP_SHORT = "OpsVault", CREDIT = "by @aiforge.team", APP_VER = "v0.8", APP_CACHE = "opsvault-v9"; // APP_CACHE = nome do cache em sw.js
 const $ = s => document.querySelector(s);
 const APP = $('#app');
 const enc = new TextEncoder(), dec = new TextDecoder();
@@ -355,7 +355,7 @@ function viewAlvoForm(id, opId) {
   tabs('ops'); const a = id ? getAlvo(id) : null; if (id && !a) return location.hash = '#ops';
   const oid = a?.opId || opId;
   APP.innerHTML = `<div class="back" onclick="history.back()">‹ Voltar</div><h1>${a ? 'Editar alvo' : 'Novo alvo'}</h1>
-  <div class="ocrbar"><div class="btn sm" id="a_ocr">🪪 Ler documento</div><span class="sub">foto do RG/CNH · leitura no aparelho</span></div><div id="a_docpend"></div>
+  <div class="ocrbar"><div class="btn sm" id="a_ocr">🪪 Ler documento</div><div class="btn sm" id="a_cnh">🪪 Ler CNH (modelo)</div><span class="sub">foto do RG/CNH · leitura no aparelho</span></div><div id="a_docpend"></div>
   <label>Operação</label><select id="a_op">${S.ops.map(o => `<option value="${o.id}" ${o.id === oid ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select>
   <label>Nome completo</label><input id="a_nome" value="${esc(a?.nome)}">
   <label>Apelido / vulgo</label><input id="a_apelido" value="${esc(a?.apelido)}">
@@ -380,6 +380,7 @@ function viewAlvoForm(id, opId) {
   let docPend = null; // imagem do documento escolhida na leitura: só vai para o cofre ao salvar o alvo
   const drawDocPend = () => { $('#a_docpend').innerHTML = docPend ? `<div class="sub ocrpend">🪪 A imagem do documento será salva${a && a.docFoto ? ' (substitui a atual)' : ''} ao tocar em <b>Salvar alvo</b>. <span id="a_docx" style="color:#ffadad;cursor:pointer">Não salvar</span></div>` : ''; const x = $('#a_docx'); if (x) x.onclick = () => { docPend = null; drawDocPend(); }; };
   $('#a_ocr').onclick = () => docOcrStart(r => { if (r.img) { docPend = r.img; drawDocPend(); } });
+  $('#a_cnh').onclick = () => cnhStart(r => { if (r.img) { docPend = r.img; drawDocPend(); } });
   $('#a_placa').onclick = () => plateOcrStart(pl => { const el = $('#a_veic'); el.value = putPlate(el.value, pl); el.dispatchEvent(new Event('input')); toast('🚗 Placa ' + pl + ' no campo Veículo — confira e salve'); });
   micify(APP);
   drawM(); $('#a_madd').onclick = () => { mands.push({num: '', status: 'aberto', data: ''}); drawM(); };
@@ -1176,6 +1177,10 @@ function viewAjuda() {
     ['🎤 Ditado por voz', `<ul><li>Nos campos de texto de anotação e observação (Anotar, Nota rápida, observação do local, descrição da operação, pendência, vínculos e filiação) aparece um <b>🎤</b> no canto. Toque, fale e o texto é <b>acrescentado ao final</b> do que já está escrito. Toque de novo para parar.</li><li>Confira o texto antes de salvar — nomes e números costumam sair errados.</li><li>O botão só aparece se o navegador tiver reconhecimento de fala. Na primeira vez, permita o microfone.</li></ul><div class="warn" style="margin-bottom:0">🔐 <b>Privacidade:</b> o reconhecimento de fala é feito pelo sistema/navegador e <b>pode ser processado em servidores externos</b> — no iPhone, pela <b>Apple</b>; no Android/Chrome, pelo <b>Google</b>. O áudio não passa pelo cofre, mas sai do aparelho. Para conteúdo sensível, digite. Alternativa: o <b>🎤 do próprio teclado</b> do iPhone (que, conforme o modelo e o idioma, também pode usar os servidores da Apple).</div>`],
     ['🔎 Ler documento e placa (OCR)', `<p>A leitura é feita <b>no próprio aparelho</b> (tesseract, português). A imagem <b>não é enviada</b> para nenhum servidor. Na 1ª leitura, o leitor (~6 MB) é carregado do endereço do app e fica guardado para uso sem internet.</p><ol><li><b>🪪 Ler documento</b> (no topo de <b>Novo alvo</b> / <b>Editar</b>): fotografe ou escolha a imagem do <b>RG ou CNH</b>. O app procura <b>nome, CPF</b> (com conferência dos dígitos verificadores), <b>RG</b>, <b>data de nascimento</b> e <b>filiação</b>.</li><li>Abre a tela <b>Conferir leitura</b>: corrija o que precisar e marque só os campos que quer usar. <b>Preencher campos</b> copia para o formulário — <b>nada é salvo</b> até você tocar em <b>Salvar alvo</b>.</li><li>Com <b>Guardar esta imagem como foto do documento</b> ligado, a imagem vira a 🪪 foto do documento do alvo (criptografada, fora da galeria) ao salvar.</li><li><b>🚗 Ler placa</b> (ao lado de Veículo): escolha a foto, <b>arraste um retângulo</b> bem justo em volta da placa e toque em <b>Ler placa</b>. Aceita o modelo antigo (<span class="kbd">ABC-1234</span>) e o Mercosul (<span class="kbd">ABC1D23</span>), corrigindo trocas comuns pela posição (O/0, I/1, B/8, S/5, Z/2). Confirme e a placa vai para o campo Veículo.</li></ol><div class="warn" style="margin-bottom:0">A <b>precisão varia</b>: documento plano, boa luz, sem reflexo do plástico, foto de frente e só o documento no quadro ajudam muito. CNH digital (tela) e RG antigo manuscrito costumam falhar. Sempre confira com o documento.</div>`],
     ['🧾 Extrair alvos de texto, PDF e Word (v0.7)', `<p>Transforma um <b>BO, relatório ou mensagem</b> em alvos, sem digitar tudo. Abra em <b>Cofre → Extrair alvos de texto/documento</b> ou em <b>Importar em lote</b> (na operação ou no Cofre).</p><ol><li><b>Cole o texto</b> ou toque em <b>📎 Escolher PDF, Word (.docx) ou .txt</b>. O PDF com texto é lido direto; o <b>PDF digitalizado</b> (imagem) pode ser lido com o OCR do aparelho (até 15 páginas). Word antigo <span class="kbd">.doc</span> não é aceito: salve como <span class="kbd">.docx</span> ou PDF.</li><li>O app procura <b>nomes</b> (sequências em MAIÚSCULAS, “nome:”, “qualificado como”…), <b>vulgo</b> (“vulgo”, “v.”, “alcunha”, “conhecido como”), <b>filiação</b> (“filho de”, “filiação”), <b>CPF</b> (confere os dígitos), <b>RG</b>, <b>telefones</b>, <b>placas</b> (antiga e Mercosul) com o veículo, <b>nascimento</b> (perto de “nasc.”, “nascido”, “DN”) e <b>endereços</b> (Rua, Av., Travessa… com número ou bairro).</li><li>Os dados são agrupados em <b>pessoas</b> pela proximidade (no mesmo parágrafo, perto do nome). Na tela <b>Conferir extração</b>: corrija os campos, marque/desmarque cada pessoa, toque em <b>⇄</b> para mover um telefone, placa ou endereço para outra pessoa, use <b>⋯ → Juntar</b> para unir dois cartões ou <b>Remover</b>, e <b>＋ Adicionar pessoa</b>. O que ficou sem nome por perto aparece em <b>Dados soltos</b>.</li><li>Escolha a <b>operação</b> (ou crie uma) e toque em <b>Conferir duplicados</b>: quem já existe na operação (mesmo CPF/RG ou mesmo nome) pode ser <b>completado</b> (só campos vazios + telefones/placas novos), criado de novo ou ignorado.</li><li>Opcional: <b>guardar o texto de origem</b> como anotação criptografada em cada alvo, com o nome do arquivo e o SHA-256.</li></ol><div class="warn" style="margin-bottom:0">A extração é <b>automática e aproximada</b>: pode juntar dados da pessoa errada, cortar nomes ou não ver dados escritos de forma incomum. Nada é criado sem a sua conferência. Tudo é feito no aparelho — o texto e os arquivos não são enviados a lugar nenhum.</div>`],
+    ['🤖 Formato ordenado com IA — leitura exata (v0.8)', `<p>Para texto bagunçado, <b>foto de documento</b> ou PDF difícil: uma IA organiza os dados num formato fixo e o app lê <b>cada campo exatamente</b>, sem adivinhar.</p><ol><li>Em <b>Extrair de texto/documento</b>, toque em <b>📋 Copiar instrução para IA</b> (ou <b>👁️ Ver instrução</b> para ler antes).</li><li>Abra a IA, cole a instrução e <b>anexe ou cole o material</b> (texto, foto do RG/CNH, print, PDF).</li><li>Copie a resposta da IA, cole no campo <b>Texto</b> e confira o selo <b>✅ Formato ordenado reconhecido — leitura exata</b>. Toque em <b>Extrair e conferir</b>: os mesmos cartões de conferência e a mesma checagem de duplicados.</li></ol><p><b>Formato</b> — uma pessoa por linha, campos separados por <span class="kbd">|</span>, em qualquer ordem e só os que existirem:</p><div class="kbd" style="display:block;white-space:normal;word-break:break-word;padding:8px 10px;margin:6px 0">NOME: … | VULGO: … | CPF: … | RG: … | NASC: dd/mm/aaaa | MÃE: … | PAI: … | NATURALIDADE: … | PROFISSÃO: … | ENDEREÇO: … | TELEFONES: …; … | VEÍCULO: … | PLACA: … | REDES: … | PAPEL: … | OBS: …</div><ul><li>Também vale <b>um campo por linha</b> (<span class="kbd">NOME: …</span> em uma linha, <span class="kbd">CPF: …</span> na outra), com <b>linha em branco</b> ou <span class="kbd">---</span> entre as pessoas, e uma lista <b>JSON</b> com as mesmas chaves.</li><li>Chaves sem diferença entre maiúsculas e acentos (<span class="kbd">Mae</span> = <span class="kbd">MÃE</span>); aceita sinônimos (Alcunha, Data de nascimento, Celular, Endereço residencial…).</li><li><b>MÃE/PAI</b> → filiação; <b>VEÍCULO + PLACA</b> → veículo (“Fiat Uno prata ABC1D23”); <b>TELEFONES</b>, <b>ENDEREÇO</b>, <b>PLACA</b> e <b>REDES</b> aceitam vários separados por <span class="kbd">;</span>; <b>OBS</b>, naturalidade e profissão viram uma <b>anotação</b> no alvo; <b>PAPEL</b> vira etiqueta.</li><li>O <b>CPF</b> tem os dígitos conferidos: se não conferir, ele <b>fica</b> no cartão com aviso ⚠️ para você checar. Valores marcados como <span class="kbd">(incerto)</span> aparecem com aviso.</li></ul><div class="warn" style="margin-bottom:0">🔐 <b>Privacidade:</b> o app não envia nada — mas, ao colar dados numa IA externa (ChatGPT, Gemini, Copilot…), eles saem do aparelho e podem ficar guardados pelo provedor. Siga a política da sua instituição e prefira uma <b>IA institucional</b>. A IA também erra: confira com o material original antes de salvar.</div>`],
+    ['🏷️ Texto com rótulos “Campo: valor” (v0.8)', `<p>Relatórios e ofícios costumam trazer a qualificação com rótulos. O app lê esses rótulos <b>em qualquer ordem</b>, um por linha ou na mesma linha (<span class="kbd">Nome: Fulano, CPF: …, Mãe: …</span>), em maiúsculas ou minúsculas:</p><ul><li><b>Nome</b>, Nome completo, Qualificado — e Autor, Vítima, Testemunha, Investigado, Conduzido (viram etiqueta).</li><li><b>Vulgo</b>, Alcunha, Apelido, Conhecido como · <b>CPF</b>, C.P.F. · <b>RG</b>, Identidade, Doc. identidade, Cédula de identidade — com o <b>órgão emissor</b> (ex.: <span class="kbd">SSP/CE</span>) junto ou no rótulo Órgão emissor.</li><li><b>Data de nascimento</b>, Nasc., DN, Nascido em (aceita “12 de março de 1990”) · <b>Filiação</b>, <b>Mãe</b>, <b>Pai</b>, Genitora, Genitor.</li><li><b>Endereço</b>, Residência, Residente, Domicílio · <b>Telefone</b>, Celular, Fone, Contato, WhatsApp · <b>Veículo</b>, <b>Placa</b>.</li><li><b>Naturalidade</b> e <b>Profissão</b> → anotação no alvo; Redes sociais, Instagram, E-mail → redes sociais.</li></ul><ul><li>Cada novo rótulo <b>Nome</b> começa outra pessoa. Os dados com rótulo têm <b>prioridade</b> sobre os que o app só adivinha e ficam com a pessoa rotulada mais próxima.</li><li>Valores como “não consta” ou “não informado” são ignorados.</li></ul>`],
+    ['🪪 Ler CNH por modelo, com moldura (v0.8)', `<ol><li>No formulário do alvo toque em <b>🪪 Ler CNH (modelo)</b> → <b>Abrir câmera</b> (câmera traseira) ou <b>Escolher do álbum</b>. Em <b>Ler documentos em lote</b>, ligue <b>Ler como CNH (modelo)</b> (use fotos já recortadas no cartão, de frente).</li><li>Encaixe a CNH na <b>moldura verde</b> e toque em <b>Capturar</b>. Vale o cartão (modelo 2017/2019) ou a frente de dados da CNH 2022 aberta: enquadre só a parte com os dados.</li><li>Na tela seguinte, <b>arraste os 4 cantos</b> até a borda do cartão — o app <b>endireita</b> a foto (corrige inclinação e perspectiva) e lê <b>cada campo na posição dele</b>: nome, doc. identidade/órgão/UF, CPF, nascimento, filiação, nº de registro, validade e categoria, com filtros de caracteres por campo.</li><li>Na conferência, cada campo mostra a <b>% de confiança</b> do leitor; o CPF é conferido pelos dígitos verificadores. Se os campos principais vierem fracos, o app lê também a <b>página inteira</b> e completa. Nº registro, validade e categoria ficam para copiar (não têm campo próprio no alvo).</li><li><b>Dicas:</b> boa luz, <b>sem reflexo</b> (incline um pouco se o plástico brilhar), cartão plano e <b>enchendo a moldura</b>. Acentos não são inventados: o que o leitor não viu, você corrige.</li><li>As posições dos campos são uma <b>estimativa do layout</b> oficial e podem variar entre emissões — confira sempre. A imagem endireitada pode ser guardada como <b>foto do documento</b> (criptografada).</li></ol>`],
+    ['📲 CNH digital em PDF (v0.8)', `<ol><li>Exporte a CNH digital pelo app <b>Carteira Digital de Trânsito (CDT)</b> ou pelo <b>gov.br</b> (compartilhar/baixar PDF) e salve em Arquivos.</li><li>No Cofre: <b>Importar em lote → Extrair de documento</b> e escolha o PDF. Se o PDF tiver texto selecionável com os rótulos da CNH, aparece <b>🪪 CNH digital reconhecida</b>: os campos são lidos pela <b>posição de cada rótulo</b> (valor ao lado ou logo abaixo) — leitura exata, sem OCR.</li><li>Confira o cartão (nome, CPF, RG/órgão, nascimento, filiação; registro, validade e categoria vão para Observações), revise duplicados e salve — como em qualquer importação, <b>nada é criado sem a conferência</b>.</li><li>PDF <b>sem texto</b> (foto/escaneado): o app oferece <b>“É uma CNH — ler por modelo”</b>, que renderiza a 1ª página e abre o ajuste de cantos da leitura por moldura.</li><li>Os modelos de PDF podem mudar; se o selo não aparecer, o texto é tratado como documento comum (extrator de “Campo: valor”).</li></ol>`],
     ['🖼️ Fotos em lote pelo nome do arquivo (v0.7)', `<ol><li><b>Cofre → Fotos em lote pelo nome do arquivo</b> (ou em Importar em lote) e escolha <b>várias fotos</b> de uma vez.</li><li>O nome de cada arquivo (sem extensão, sem acento, espaço, maiúscula ou separador) é comparado com os alvos: <b>CPF</b> ou <b>RG/documento</b> (só os dígitos — <span class="kbd">529.982.247-25.jpg</span>, <span class="kbd">52998224725_2.jpg</span>), <b>nome</b> (<span class="kbd">joao_carlos_da_silva.jpg</span>, <span class="kbd">Joao Silva (2).jpg</span>) ou <b>vulgo</b>. Sufixos como <span class="kbd">_2</span>, <span class="kbd">-1</span> e <span class="kbd">(3)</span> são ignorados.</li><li>Na tabela, confira o alvo de cada foto (troque na lista ou marque <b>não importar</b>). As sem correspondência ficam separadas. Em <b>Procurar alvos em</b>, limite a uma operação ou use todas.</li><li>As fotos entram como <b>fotos do álbum</b>: data e GPS do EXIF, SHA-256 do arquivo original, criptografadas; opcionalmente a 1ª vira <b>capa</b> (se o alvo não tiver capa escolhida) e ganha <b>carimbo</b>.</li></ol>`],
     ['🪪 Leitura de documentos em lote (v0.7)', `<ol><li><b>Cofre → Ler documentos em lote</b> (ou em Importar em lote). <b>📷 Fotografar</b> um por um ou <b>🖼️ Escolher várias</b> imagens de RG/CNH; toque numa miniatura para tirar da fila.</li><li><b>Ler N documento(s)</b>: as imagens são lidas <b>uma por vez</b>, no aparelho, com barra de progresso e <b>Cancelar</b>, que pausa a fila: <b>continue</b> de onde parou ou <b>confira</b> o que já foi lido.</li><li>Cada documento vira um cartão com nome, CPF (com verificação dos dígitos), RG, nascimento e filiação, a miniatura da imagem e o texto lido. Corrija, marque/desmarque, junte cartões do mesmo documento (frente e verso) e escolha a operação.</li><li>Na etapa de <b>duplicados</b>, complete um alvo existente ou crie novos. Com <b>Guardar como foto do documento</b>, a imagem vira a 🪪 foto do documento do alvo (criptografada, com SHA-256; num alvo que já tem foto do documento, ela <b>não</b> é trocada).</li></ol><div class="warn" style="margin-bottom:0">O OCR <b>erra</b> com reflexo, foto torta ou CNH digital na tela. Confira cada número com o documento antes de salvar.</div>`],
     ['🛡️ Segurança', `<ul><li>O app trava sozinho após inatividade (ajuste na aba Cofre) e sempre que sai da tela.</li><li>Nada é enviado para servidor: sem nuvem, sem conta.</li><li>Use um PIN diferente do desbloqueio do celular.</li><li>Antes de usar em serviço, confirme a política da sua instituição e a LGPD para dados de investigação.</li></ul>`]
@@ -2467,14 +2472,14 @@ function ocrStop() { if (TESS) { const t = TESS; TESS = null; t.then(w => w.term
 async function runOcr(cv, params, onProg) {
   OCR_PROG = onProg || null;
   try { const w = await ocrWorker(), tp = TESS; const live = () => { if (!tp || TESS !== tp) throw new Error('leitura cancelada'); }; // leitor encerrado (Cancelar/travar) no meio: não manda mais nada a ele
-    live(); await w.setParameters(Object.assign({tessedit_char_whitelist: '', tessedit_pageseg_mode: '3', preserve_interword_spaces: '1', user_defined_dpi: '300'}, params || {})); live(); const {data} = await w.recognize(cv); return data; }
+    live(); await w.setParameters(Object.assign({tessedit_char_whitelist: '', tessedit_pageseg_mode: '3', preserve_interword_spaces: '1', user_defined_dpi: '300', debug_file: '/dev/null'}, params || {})); live(); const {data} = await w.recognize(cv); return data; }
   finally { OCR_PROG = null; }
 }
 const ocrStepTxt = m => ({'loading tesseract core': 'Carregando o leitor…', 'initializing tesseract': 'Preparando…', 'loading language traineddata': 'Carregando o português…', 'initializing api': 'Preparando…', 'recognizing text': 'Lendo o texto…'})[m.status] || 'Preparando…';
 function loadImg(file) { return new Promise((res, rej) => { const u = URL.createObjectURL(file); const img = new Image(); img.onload = () => res({img, u}); img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('imagem inválida')); }; img.src = u; }); }
 /* recorte → canvas em tons de cinza com contraste esticado (ajuda o OCR com foto escura/lavada) */
 function ocrCanvas(img, r, maxSide, minH, invert) {
-  r = r || {x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight};
+  r = r || {x: 0, y: 0, w: img.naturalWidth || img.width, h: img.naturalHeight || img.height}; // imagem ou canvas
   let k = Math.min(1, maxSide / Math.max(r.w, r.h)); if (minH && r.h * k < minH) k = Math.min(minH / r.h, maxSide / r.w, 6);
   const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(r.w * k)); c.height = Math.max(1, Math.round(r.h * k));
   const x = c.getContext('2d', {willReadFrequently: true}); x.imageSmoothingQuality = 'high'; x.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
@@ -2572,10 +2577,12 @@ async function docOcrRun(file, onDone) {
   } catch (e) { console.warn(e); if (KEY) { closeSheet(); toast('Leitura falhou: ' + e.message); } }
   finally { if (li) URL.revokeObjectURL(li.u); }
 }
-function docReview(ex, raw, img, onDone) {
+function docReview(ex, raw, img, onDone, conf) {
   const best = ex.cpfs[0];
-  const row = (k, lbl, inner, on) => `<div class="ocrrow"><label class="ocrl"><input type="checkbox" class="ocrck" data-k="${k}" ${on ? 'checked' : ''}> ${lbl}</label>${inner}</div>`;
-  sheet(`<h2 style="margin-top:0">🪪 Conferir leitura</h2>
+  const cf = k => conf && conf[k] != null ? ` <span class="confchip ${conf[k] >= 80 ? 'hi' : conf[k] >= 60 ? 'md' : 'lo'}" title="confiança do OCR">${conf[k]}%</span>` : conf ? ' <span class="confchip lo">não lido</span>' : '';
+  const row = (k, lbl, inner, on) => `<div class="ocrrow"><label class="ocrl"><input type="checkbox" class="ocrck" data-k="${k}" ${on ? 'checked' : ''}> ${lbl}${cf(k === 'fil' ? 'fil' : k)}</label>${inner}</div>`;
+  sheet(`<h2 style="margin-top:0">🪪 Conferir leitura${ex.cnh ? ' — CNH (modelo)' : ''}</h2>
+    ${ex.cnh ? `<div class="exok" style="margin-top:4px">🪪 <b>Leitura por moldura (zona a zona)</b><div class="sub">${ex.fallback ? 'alguns campos vieram da leitura da página inteira' : 'cada campo lido na posição do modelo'} · % = confiança do OCR</div></div>${cnhObs(ex) ? `<div class="sub" style="margin:6px 4px 0">📋 ${esc(cnhObs(ex))}${conf ? ` <span class="sub">(${['registro', 'validade', 'cat'].filter(k => conf[k] != null).map(k => conf[k] + '%').join(' · ')})</span>` : ''} <span class="chip c-gray" id="or_cnhcp" style="cursor:pointer">📋 copiar</span><div class="sub" style="margin-top:2px">sem campo próprio no alvo — copie para Vínculos/observações se quiser</div></div>` : ''}` : ''}
     <div class="warn" style="margin-top:6px">A leitura automática <b>pode errar</b> (luz, foco, reflexo, modelo do documento). Confira cada campo com o documento. Só os campos marcados vão para o formulário, e nada é salvo até você tocar em <b>Salvar alvo</b>.</div>
     ${row('nome', 'Nome', `<input id="or_nome" value="${esc(ex.nome)}">`, !!ex.nome)}
     ${row('cpf', 'CPF', `<input id="or_cpf" inputmode="numeric" value="${esc(best ? cpfFmt(best.d) : '')}"><div class="sub" id="or_cpfst" style="margin:6px 4px 0"></div>${ex.cpfs.length > 1 ? `<div class="chips" style="margin-top:6px">${ex.cpfs.slice(0, 4).map(c => `<span class="chip ${c.ok ? 'c-grn' : 'c-gray'} orcpf" data-d="${c.d}">${cpfFmt(c.d)}</span>`).join('')}</div>` : ''}`, !!(best && best.ok))}
@@ -2591,6 +2598,7 @@ function docReview(ex, raw, img, onDone) {
     s.querySelectorAll('.orcpf').forEach(c => c.onclick = () => { q('#or_cpf').value = cpfFmt(c.dataset.d); q('#or_cpf').oninput(); });
     [['nome', '#or_nome'], ['rg', '#or_rg'], ['nasc', '#or_nasc'], ['fil', '#or_fil']].forEach(([k, sel]) => q(sel).addEventListener('input', () => { q(`.ocrck[data-k="${k}"]`).checked = !!q(sel).value.trim(); }));
     q('#or_img').onclick = () => { keepImg = !keepImg; q('#or_img').classList.toggle('on', keepImg); };
+    if (q('#or_cnhcp')) q('#or_cnhcp').onclick = () => copyText(cnhObs(ex)).then(ok => toast(ok ? '📋 Dados da CNH copiados' : 'Não consegui copiar'));
     q('#or_cn').onclick = closeSheet;
     q('#or_ok').onclick = () => {
       const on = k => q(`.ocrck[data-k="${k}"]`).checked, v = sel => q(sel).value.trim(), set = (id, val) => { const el = $(id); if (el) { el.value = val; el.dispatchEvent(new Event('input')); } };
@@ -3184,9 +3192,10 @@ function extractEntities(text) {
   const ents = [], anchors = [];
   const mask = (i, j) => { M = M.slice(0, i) + ' '.repeat(j - i) + M.slice(j); };
   const near = (i, re, back = 30) => re.test(T.slice(Math.max(0, i - back), i));
+  { const LB = exLabeled(T); ents.push(...LB.ents); anchors.push(...LB.anchors); LB.spans.forEach(([a, b]) => mask(a, b)); } // v0.8: “Campo: valor” primeiro (prioridade)
   const scan = (re, fn) => { re.lastIndex = 0; const hits = []; let m; while ((m = re.exec(M))) { hits.push(m); if (!m[0].length) re.lastIndex++; } hits.forEach(fn); };
   const cut = (s, max) => { // fim do trecho: quebra de linha, ; ou próximo rótulo
-    const re = /\n|;|[,.]?\s*\b(?:telefone|tel\.?|fone|cel(?:ular)?|whats(?:app)?|zap|cpf|rg|nascid[oa]|nasc\.|natural|filh[oa]\s+de|filia[çc][ãa]o|vulgo|alcunha|conhecid[oa]|portador|inscrit[oa]|ve[ií]culo|placa|e-?mail|residente|domiciliad[oa]|brasileir[oa]|solteir[oa]|casad[oa]|profiss[ãa]o|estado civil)\b|\.\s+(?=[A-ZÀ-Ú])/i;
+    const re = /\n|;|[,.]?\s*\b(?:telefone|tel\.?|fone|cel(?:ular)?|whats(?:app)?|zap|cpf|rg|nascid[oa]|nasc\.|natural|filh[oa]\s+de|filia[çc][ãa]o|vulgo|alcunha|conhecid[oa]|portador|inscrit[oa]|ve[ií]culo|placa|e-?mail|residente|domiciliad[oa]|brasileir[oa]|solteir[oa]|casad[oa]|profiss[ãa]o|estado civil)\b|[,.]?\s*\b(?:m[ãa]e|pai|genitora?|nome|endere[çc]o|naturalidade|identidade|apelido|contato|ocupa[çc][ãa]o|redes?\s+sociais)\s*:|\.\s+(?=[A-ZÀ-Ú])/i;
     const m = s.slice(0, max).match(re); return m ? m.index : Math.min(s.length, max);
   };
   // CPF (com ou sem pontuação; sem pontuação só vale se os dígitos conferirem ou houver o rótulo CPF perto)
@@ -3235,6 +3244,7 @@ function extractEntities(text) {
   scan(new RegExp(`(^|[^${EX_L}])(Rua|R\\.|Avenida|Av\\.?|Travessa|Trav\\.|Tv\\.|Alameda|Al\\.|Estrada|Rodovia|Rod\\.|Pra[çc]a|P[çc]a\\.?|Beco|Largo|Viela|Passagem|Conjunto|Cj\\.|Residencial|Loteamento|S[íi]tio|Fazenda|Vila)\\s+`, 'gi'), m => {
     const i = m.index + m[1].length; if (M[i] === ' ') return; // já reconhecido
     const s = T.slice(i, i + 220); const pre = s.slice(0, m[2].length + 1); let k = cut(s.slice(pre.length), 200) + pre.length;
+    { const pz = s.slice(0, k).search(/,\s+(?:a|o|as|os|onde|que|quando|quem|foi|foram|tendo|sendo|ocasi[ãa]o|momento|local\s+(?:em|onde)|e\s+(?:a|o|foi))\s/); if (pz > pre.length) k = pz; } // v0.8: endereço não engole a frase seguinte
     let addr = s.slice(0, k).replace(/[\s,.;:\-–]+$/, '').replace(/\s+/g, ' ').trim();
     if (!/\d|s\/n|bairro/i.test(addr) || addr.length < 8) return;
     ents.push({k: 'end', v: addr, i}); mask(i, i + k);
@@ -3275,7 +3285,7 @@ function extractEntities(text) {
     });
   });
   // papel (autor, vítima…) nas 40 letras antes do nome
-  anchors.forEach(an => { if (!an.role) { const back = T.slice(Math.max(0, an.i - 40), an.i).split(/[.;\n]/).pop(); an.role = (EX_ROLE.find(([, re]) => re.test(back)) || [])[0] || ''; } an.b = exBlockOf(bs, an.i); });
+  anchors.forEach(an => { if (!an.role) { const back = T.slice(Math.max(0, an.i - 40), an.i).replace(/\b(sra?|dra?)\./gi, '$1 ').split(/[.;\n]/).pop(); an.role = (EX_ROLE.find(([, re]) => re.test(back)) || [])[0] || ''; } an.b = exBlockOf(bs, an.i); });
   anchors.sort((x, y) => x.i - y.i); ents.sort((x, y) => x.i - y.i);
   return {T, anchors, ents, bs};
 }
@@ -3285,31 +3295,37 @@ function exCandidates(text) {
   const {T, anchors, ents, bs} = extractEntities(text);
   const cards = [], byKey = new Map(), loose = [];
   const cardFor = an => { const k = exKey(an.nome); if (byKey.has(k)) { const c = byKey.get(k); if (!c.papel && an.role) c.papel = an.role; return c; }
+    if (!an.fl && k.includes(' ')) { const hit = [...byKey].find(([kk, c]) => c.fl && (kk + ' ').startsWith(k + ' ')); if (hit) { byKey.set(k, hit[1]); return hit[1]; } } // v0.8: “Paulo Roberto” = “Paulo Roberto Nascimento” rotulado antes
     const nome = an.nome === an.nome.toUpperCase() ? titleName(an.nome.replace(/\s+/g, ' ')) : an.nome.replace(/\s+/g, ' ');
-    const c = exCard({nome, papel: an.role || '', lab: !!an.lab}); byKey.set(k, c); cards.push(c); return c; };
+    const c = exCard({nome, papel: an.role || '', lab: !!an.lab}); if (an.fl) c.fl = true; byKey.set(k, c); cards.push(c); return c; };
   anchors.forEach(an => an.c = cardFor(an));
-  for (const e of ents) {
-    const b = exBlockOf(bs, e.i); let an = null;
-    for (const x of anchors) { if (x.b !== b) continue; if (x.i <= e.i) an = x; else { if (!an && x.i - e.i <= 160 && e.k !== 'fil' && e.k !== 'vulgo') an = x; break; } }
+  // v0.8: dados rotulados (“CPF: …”) vão primeiro (prioridade sobre os adivinhados) e só para nomes rotulados do mesmo bloco, quando houver
+  const labAn = anchors.filter(x => x.fl);
+  for (const e of [...ents.filter(x => x.lab), ...ents.filter(x => !x.lab)]) {
+    const b = exBlockOf(bs, e.i); let an = null; const pool = e.lab && labAn.some(x => x.b === b) ? labAn : anchors;
+    for (const x of pool) { if (x.b !== b) continue; if (x.i <= e.i) an = x; else { if (!an && x.i - e.i <= (e.lab ? 400 : 160) && (e.lab || (e.k !== 'fil' && e.k !== 'vulgo'))) an = x; break; } }
     if (!an) { loose.push(exItem(e.k, e.v, e.ok)); continue; }
     exPut(an.c, exItem(e.k, e.v, e.ok), loose);
   }
-  cards.forEach(c => { c.inc = !!(c.cpf || c.rg || c.nasc || c.fil || c.apelido || c.tels.length || c.veics.length || c.ends.length || c.lab); });
+  cards.forEach(c => { c.inc = !!(c.cpf || c.rg || c.nasc || c.fil || c.apelido || c.tels.length || c.veics.length || c.ends.length || c.obs || c.redes || c.lab); });
   return {cards, loose, text: T};
 }
 let EX_SEQ = 0;
 const exItem = (k, v, ok) => ({id: 'i' + (++EX_SEQ), k, v, ok: ok !== false});
-function exCard(o) { return Object.assign({id: 'c' + (++EX_SEQ), inc: true, nome: '', apelido: '', cpf: '', rg: '', nasc: '', fil: '', tels: [], veics: [], ends: [], papel: '', lab: false}, o || {}); }
+function exCard(o) { return Object.assign({id: 'c' + (++EX_SEQ), inc: true, nome: '', apelido: '', cpf: '', rg: '', nasc: '', fil: '', tels: [], veics: [], ends: [], papel: '', lab: false, redes: '', obs: ''}, o || {}); }
 const EX_LIST = {tel: 'tels', veic: 'veics', end: 'ends'}, EX_SCAL = {cpf: 'cpf', rg: 'rg', nasc: 'nasc', vulgo: 'apelido', fil: 'fil', nome: 'nome'};
-const EX_ICON = {tel: '📞', veic: '🚗', end: '🏠', cpf: '🪪 CPF', rg: '🪪 RG', nasc: '🎂', vulgo: '“”', fil: '👪', nome: '👤'};
+const EX_ICON = {tel: '📞', veic: '🚗', end: '🏠', cpf: '🪪 CPF', rg: '🪪 RG', nasc: '🎂', vulgo: '“”', fil: '👪', nome: '👤', rgorg: '🪪 Órgão', nat: '📍 Natural de', prof: '💼', rede: '🌐', obs: '🗒️'};
 /* põe um dado num cartão; campo único já ocupado → o valor antigo vai para os dados soltos */
 function exPut(c, it, loose) {
+  if (it.k === 'rgorg') { if (c.rg && !/[A-Za-z]/.test(c.rg)) c.rg += ' ' + it.v; else if (!c.rg) c._rgorg = it.v; return; }
+  if (it.k === 'nat' || it.k === 'prof' || it.k === 'obs') { const l = (it.k === 'nat' ? 'Naturalidade: ' : it.k === 'prof' ? 'Profissão: ' : '') + it.v; if (!c.obs.split('\n').some(x => exKey(x) === exKey(l))) c.obs = c.obs ? c.obs + '\n' + l : l; return; }
+  if (it.k === 'rede') { if (!c.redes.split('\n').some(x => exKey(x) === exKey(it.v))) c.redes = c.redes ? c.redes + '\n' + it.v : it.v; return; }
   if (EX_LIST[it.k]) { const L = c[EX_LIST[it.k]]; const key = it.k === 'tel' ? (x => { const n = telNorm(x); return n ? n.ddd + n.l8 : _digits(x); }) : it.k === 'veic' ? (x => platesIn(x)[0] || exKey(x)) : exKey;
     if (!L.some(x => key(x) === key(it.v))) L.push(it.v); return; }
   const f = EX_SCAL[it.k]; if (!f) return;
   if (f === 'fil') { const cur = c.fil ? c.fil.split('\n') : []; it.v.split('\n').forEach(p => { if (p && !cur.some(x => exKey(x) === exKey(p))) cur.push(p); }); c.fil = cur.join('\n'); return; }
   if (f === 'cpf' && it.ok === false) c.cpfWarn = true;
-  if (!c[f]) { c[f] = it.v; return; }
+  if (!c[f]) { c[f] = it.v; if (f === 'rg' && c._rgorg && !/[A-Za-z]/.test(c.rg)) { c.rg += ' ' + c._rgorg; delete c._rgorg; } return; }
   if (exKey(c[f]) === exKey(it.v) || _digits(c[f]) && _digits(c[f]) === _digits(it.v)) return;
   if (f === 'cpf' && !cpfValid(c[f]) && cpfValid(it.v)) { loose.push(exItem('cpf', c[f], false)); c[f] = it.v; return; }
   loose.push(it);
@@ -3360,6 +3376,11 @@ async function exDocx(buf) {
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 function exDecodeText(buf) { try { return new TextDecoder('utf-8', {fatal: true}).decode(buf); } catch (e) { return new TextDecoder('windows-1252').decode(buf); } }
+/* resultado da CNH por modelo → cartão de conferência (lote / PDF digitalizado) */
+function cnhCardOf(r, img, blob, name) { const ex = r.ex, best = ex.cpfs[0];
+  return exCard({nome: ex.nome, cpf: best ? cpfFmt(best.d) : '', cpfWarn: !!(best && !best.ok), rg: ex.rg, nasc: ex.nasc, fil: ex.filiacao.join('\n'), obs: cnhObs(ex).replace(/ · /g, '\n'), inc: !!(ex.nome || (best && best.ok)), raw: r.raw, keepImg: true, conf: r.conf,
+    img: {bytes: img, url: exUrl(blob), name: name || 'cnh.jpg', hashOrig: ''}}); }
+async function cnhToReview(r, img, blob, src, opId) { const c = cnhCardOf(r, img, blob, (src && src.name || 'cnh').replace(/\.pdf$/i, '') + '_p1.jpg'); c.img.hashOrig = src && src.hash || await sha256(img); closeSheet(); EX_SEQ_PANEL++; exReview({mode: 'doc', cards: [c], loose: [], src: {}, opId: exDefOp(opId), newOp: '', keepNote: false, cnhModel: true}); }
 const exKind = (name, u8) => u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46 ? 'pdf' : u8[0] === 0x50 && u8[1] === 0x4b ? 'docx' : u8[0] === 0xd0 && u8[1] === 0xcf && u8[2] === 0x11 && u8[3] === 0xe0 ? 'doc' : /\.(rtf)$/i.test(name) ? 'rtf' : 'txt';
 
 /* ---- painel de tela cheia (fecha sozinho ao travar o cofre: classe viewer) ---- */
@@ -3380,8 +3401,16 @@ function extractUI(opId, pre) {
   // pre = {src, text}: reabre a tela com o arquivo já carregado (após o aviso de OCR / .doc, que usam a mesma folha)
   const src = pre && pre.src || {name: '', kind: 'texto', hash: '', pages: 0};
   sheet(`<h2 style="margin-top:0">🧾 Extrair de texto/documento</h2>
-    <div class="sub" style="margin:0 4px 8px;line-height:1.45">Cole o texto de um <b>BO, relatório ou mensagem</b> (WhatsApp) ou escolha um <b>PDF</b> ou <b>Word (.docx)</b>. O app procura nomes, CPF, RG, telefones, placas, nascimento, filiação, vulgo e endereços — <b>tudo no aparelho</b>.</div>
-    <label>Texto</label><textarea id="ex_t" style="min-height:170px" placeholder="Cole aqui o texto…"></textarea>
+    <div class="sub" style="margin:0 4px 8px;line-height:1.45">Cole o texto de um <b>BO, relatório, ofício ou mensagem</b> (WhatsApp) ou escolha um <b>PDF</b> ou <b>Word (.docx)</b>. O app procura nomes, CPF, RG, telefones, placas, nascimento, filiação, vulgo e endereços — <b>tudo no aparelho</b>. Rótulos como <span class="kbd">Nome:</span> <span class="kbd">CPF:</span> <span class="kbd">Mãe:</span> <span class="kbd">Endereço:</span> são lidos em qualquer ordem.</div>
+    <div class="card glass exai" style="cursor:default">
+      <div class="t">🤖 Texto difícil? Organize com uma IA</div>
+      <div class="sub" style="line-height:1.45;margin-top:4px">Copie a instrução, cole numa IA <b>junto com o texto, a foto ou o PDF</b> e cole aqui a resposta. No <b>formato ordenado</b> o app lê cada campo <b>exatamente</b>, sem adivinhar.</div>
+      <div class="grid2" style="margin-top:10px"><div class="btn pri" id="ex_aicp">📋 Copiar instrução para IA</div><div class="btn" id="ex_aiv">👁️ Ver instrução</div></div>
+      <div id="ex_aip" class="hidden"><pre class="exprompt">${esc(AF_PROMPT)}</pre></div>
+      <div class="warn" style="margin:10px 0 0">🔐 Enviar dados a um <b>serviço externo de IA</b> (ChatGPT, Gemini, Copilot…) tira as informações do aparelho e pode deixá-las guardadas pelo provedor. Siga a <b>política da sua instituição</b> e prefira uma <b>IA institucional</b>. O app em si não envia nada.</div>
+    </div>
+    <label>Texto</label><textarea id="ex_t" style="min-height:170px" placeholder="Cole aqui o texto ou a resposta da IA…"></textarea>
+    <div id="ex_fmt"></div>
     <div class="sub" id="ex_src" style="margin:6px 4px 0"></div>
     <div class="btn" id="ex_file" style="margin-top:12px">📎 Escolher PDF, Word (.docx) ou .txt</div>
     <div class="warn" style="margin-bottom:0">A extração é <b>automática</b> e pode errar ou deixar passar dados. Na próxima tela você confere tudo; <b>nenhum alvo é criado sem a sua revisão</b>.</div>
@@ -3389,19 +3418,23 @@ function extractUI(opId, pre) {
     <div class="credit">${esc(APP_NAME)} · <b>${esc(CREDIT)}</b></div>`, s => {
     const ta = s.querySelector('#ex_t'), st = s.querySelector('#ex_src');
     if (pre && pre.text != null) { ta.value = pre.text; exSrcInfo(st, src, pre.text); }
-    ta.oninput = () => { if (src.kind !== 'texto' && src.loaded !== ta.value) { src.edited = true; st.textContent = `📄 ${src.name} · texto editado depois de carregado`; } };
+    const fmt = () => { const el = s.querySelector('#ex_fmt'); if (el) el.innerHTML = afBadge(ta.value.length < 300000 ? afDetect(ta.value) : null); }; fmt();
+    ta.oninput = () => { fmt(); if (src.kind !== 'texto' && src.loaded !== ta.value) { src.edited = true; st.textContent = `📄 ${src.name} · texto editado depois de carregado`; } };
+    s.querySelector('#ex_aicp').onclick = async () => toast(await copyText(AF_PROMPT) ? '📋 Instrução copiada — cole na IA junto com o texto, a foto ou o PDF' : 'Não consegui copiar: toque em Ver instrução e copie à mão', 3500);
+    s.querySelector('#ex_aiv').onclick = e => { const b = s.querySelector('#ex_aip'), open = b.classList.toggle('hidden') === false; e.currentTarget.textContent = open ? '🙈 Ocultar instrução' : '👁️ Ver instrução'; };
     s.querySelector('#ex_file').onclick = () => pickFile('application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,text/plain,.txt,application/msword,.doc', f => exLoadFile(f, opId, src.kind === 'texto' ? ta.value : ''));
     s.querySelector('#ex_go').onclick = async () => {
       const t = ta.value; if (!t.trim()) return toast('Cole um texto ou escolha um arquivo');
       if (src.kind === 'texto') { src.name = ''; src.hash = await sha256(t); }
-      const r = exCandidates(t); EX_SEQ_PANEL++;
-      closeSheet(); exReview({mode: 'text', cards: r.cards, loose: r.loose, src: Object.assign({}, src, {text: t}), opId: exDefOp(opId), newOp: '', keepNote: true});
+      const r = afParse(t) || exCandidates(t); EX_SEQ_PANEL++;
+      if (r.exact && r.exact.kind === 'none') return toast('A resposta diz NENHUMA PESSOA — nada a importar');
+      closeSheet(); exReview({mode: 'text', cards: r.cards, loose: r.loose, src: Object.assign({}, src, {text: t}), opId: exDefOp(opId), newOp: '', keepNote: true, exact: r.exact || null});
     };
   });
 }
 function exSrcInfo(st, src, text) {
   if (!st) return;
-  st.innerHTML = `📄 <b>${esc(src.name)}</b> · ${({pdf: 'PDF', 'pdf-ocr': 'PDF digitalizado (OCR)', docx: 'Word', txt: 'texto'})[src.kind] || ''}${src.pages ? ` · ${src.pages} página(s)` : ''} · ${text.length} caracteres${src.edited ? ' · editado' : ''}<br><span style="font-size:11px">SHA-256 ${esc(src.hash.slice(0, 24))}…</span>`;
+  st.innerHTML = `📄 <b>${esc(src.name)}</b> · ${({pdf: 'PDF', 'pdf-ocr': 'PDF digitalizado (OCR)', 'cnh-e': 'CNH digital (PDF)', docx: 'Word', txt: 'texto'})[src.kind] || ''}${src.pages ? ` · ${src.pages} página(s)` : ''} · ${text.length} caracteres${src.edited ? ' · editado' : ''}<br><span style="font-size:11px">SHA-256 ${esc(src.hash.slice(0, 24))}…</span>`;
 }
 /* lê o arquivo escolhido e reabre a tela de entrada com o texto (a folha pode ter sido usada por avisos/OCR no meio) */
 async function exLoadFile(f, opId, typed) {
@@ -3418,9 +3451,12 @@ async function exLoadFile(f, opId, typed) {
       say('⏳ Abrindo o PDF (leitor carregado do app na 1ª vez)…');
       const pdf = await exPdfOpen(buf); src.pages = pdf.numPages;
       try {
+        // v0.8: CNH digital (CNH-e) — leitura exata pela posição dos rótulos na camada de texto
+        try { const cn = cnheExtract(await cnhePdfItems(pdf)); if (cn) { src.kind = 'cnh-e'; src.text = (await exPdfText(pdf)).join('\n\n'); src.loaded = src.text; if (!KEY) return; closeSheet(); EX_SEQ_PANEL++; return exReview({mode: 'text', cards: cn.cards, loose: cn.loose, src: Object.assign({}, src), opId: exDefOp(opId), newOp: '', keepNote: true, exact: cn.exact}); } } catch (e) { console.warn('CNH-e', e); }
         text = (await exPdfText(pdf)).join('\n\n');
         if (text.replace(/\s/g, '').length < 20 * pdf.numPages) { // sem camada de texto: digitalizado
-          if (!(await exAskOcr(pdf.numPages))) return back('📄 PDF sem texto selecionável — nada extraído');
+          const ask = await exAskOcr(pdf.numPages); if (ask === 'cnh') { const pc = await exPdfPageCanvas(pdf, 1, 2000); return cnhCornerUI(pc, warped => cnhProcess(warped, null, (r, img, blob) => cnhToReview(r, img, blob, src, opId)), () => back('')); }
+          if (!ask) return back('📄 PDF sem texto selecionável — nada extraído');
           text = await exPdfOcr(pdf, Math.min(pdf.numPages, 15)); src.kind = 'pdf-ocr';
           if (text == null) return back(KEY ? 'Leitura cancelada' : '');
         }
@@ -3433,8 +3469,8 @@ async function exLoadFile(f, opId, typed) {
   } catch (e) { console.warn(e); if (!KEY) return; if (!$('#ex_t')) back(''); setTimeout(() => say('⚠️ ' + e.message), 0); toast('Erro ao ler: ' + e.message); }
 }
 function exAskOcr(n) {
-  return new Promise(res => sheet(`<h2 style="margin-top:0">📄 PDF digitalizado</h2><div class="sub" style="line-height:1.45">Este PDF <b>não tem texto selecionável</b> (parece uma imagem escaneada). Posso ler as páginas com o <b>OCR no aparelho</b> (o mesmo da leitura de documento) — ${n > 15 ? 'as <b>15 primeiras</b> de ' + n + ' páginas' : n + ' página(s)'}. Leva alguns segundos por página e o resultado costuma ter erros: confira.</div><div class="grid2" style="margin-top:16px"><div class="btn" id="ao_n">Agora não</div><div class="btn pri" id="ao_y">Ler com OCR</div></div>`, s => {
-    s.querySelector('#ao_n').onclick = () => { closeSheet(); res(false); }; s.querySelector('#ao_y').onclick = () => res(true); }));
+  return new Promise(res => sheet(`<h2 style="margin-top:0">📄 PDF digitalizado</h2><div class="sub" style="line-height:1.45">Este PDF <b>não tem texto selecionável</b> (parece uma imagem escaneada). Posso ler as páginas com o <b>OCR no aparelho</b> (o mesmo da leitura de documento) — ${n > 15 ? 'as <b>15 primeiras</b> de ' + n + ' páginas' : n + ' página(s)'}. Leva alguns segundos por página e o resultado costuma ter erros: confira.</div><div class="grid2" style="margin-top:16px"><div class="btn" id="ao_n">Agora não</div><div class="btn pri" id="ao_y">Ler com OCR</div></div><div class="btn" id="ao_cnh" style="margin-top:10px">🪪 É uma CNH — ler por modelo (1ª página)</div>`, s => {
+    s.querySelector('#ao_n').onclick = () => { closeSheet(); res(false); }; s.querySelector('#ao_y').onclick = () => res(true); s.querySelector('#ao_cnh').onclick = () => res('cnh'); }));
 }
 async function exPdfOcr(pdf, n) {
   let stop = false, cancelRes; const out = [], cancelP = new Promise(r => cancelRes = r);
@@ -3463,17 +3499,21 @@ function exReview(R) {
     <div class="row"><label class="ocrl" style="margin:0"><input type="checkbox" class="ocrck exinc" ${c.inc ? 'checked' : ''}> <b style="color:var(--txt)">${label(c)}</b>${c.papel ? ` <span class="chip c-blue">${esc(c.papel)}</span>` : ''}</label>
       <select class="exmenu" aria-label="Ações"><option value="">⋯</option>${cards.filter(x => x !== c).map(x => `<option value="m:${x.id}">Juntar com ${esc(label(x))}${x.nome ? ': ' + esc(x.nome.slice(0, 22)) : ''}</option>`).join('')}<option value="rm">Remover cartão</option></select></div>
     ${c.img ? `<div class="exdoc"><div class="th docth" style="width:96px;aspect-ratio:1.5;flex-shrink:0"><img src="${c.img.url}"></div><div><div class="sub">🪪 ${esc(c.img.name || 'imagem')}</div><label class="ocrl" style="margin:6px 0 0"><input type="checkbox" class="ocrck exkimg" ${c.keepImg ? 'checked' : ''}> Guardar como foto do documento</label></div></div>` : ''}
+    ${exCardWarn(c)}${c.conf ? `<div class="sub" style="margin:8px 2px 0">🎯 Confiança do OCR: ${[['nome', 'nome'], ['cpf', 'CPF'], ['rg', 'RG'], ['nasc', 'nasc.'], ['fil', 'filiação']].map(([k, l]) => `${l} <span class="confchip ${c.conf[k] >= 80 ? 'hi' : c.conf[k] >= 60 ? 'md' : 'lo'}">${c.conf[k] != null ? c.conf[k] + '%' : '—'}</span>`).join(' ')}</div>` : ''}
     <div class="exf"><label>Nome</label><input data-f="nome" value="${esc(c.nome)}" placeholder="obrigatório para criar"></div>
     <div class="grid2"><div class="exf"><label>Vulgo</label><input data-f="apelido" value="${esc(c.apelido)}"></div><div class="exf"><label>Nascimento</label><input data-f="nasc" type="date" value="${esc(c.nasc)}"></div></div>
     <div class="grid2"><div class="exf"><label>CPF</label><input data-f="cpf" inputmode="numeric" value="${esc(c.cpf)}"><div class="sub excpf">${exCpfSt(c.cpf)}</div></div><div class="exf"><label>RG</label><input data-f="rg" value="${esc(c.rg)}"></div></div>
     <div class="exf"><label>Filiação</label><textarea data-f="fil" style="min-height:48px">${esc(c.fil)}</textarea></div>
+    ${c.redes || c.exact ? `<div class="exf"><label>Redes sociais <span class="sub" style="font-weight:400">(uma por linha)</span></label><textarea data-f="redes" style="min-height:44px">${esc(c.redes)}</textarea></div>` : ''}
+    ${c.obs || c.exact ? `<div class="exf"><label>Observações <span class="sub" style="font-weight:400">(viram anotação no alvo)</span></label><textarea data-f="obs" style="min-height:44px">${esc(c.obs)}</textarea></div>` : ''}
     ${chips(c) ? `<div class="chips" style="margin-top:10px">${chips(c)}</div>` : ''}
     ${c.raw != null ? `<details class="ocrraw"><summary class="sub">Ver texto lido</summary><pre>${esc(c.raw || '(nada)')}</pre></details>` : ''}</div>`;
   const nInc = cards.filter(c => c.inc).length, src = R.src || {};
   exPanel(`<div class="exhead"><div class="back" id="ex_x" style="margin:0">‹ Cancelar</div><div class="sub">${R.mode === 'doc' ? '🪪 Documentos em lote' : '🧾 Extração'}</div></div>
     <h1 style="margin-top:6px">Conferir ${R.mode === 'doc' ? 'leituras' : 'extração'}</h1>
-    <div class="warn">${R.mode === 'doc' ? 'Leitura <b>automática (OCR)</b>: pode trocar letras e números. Confira cada cartão com a imagem.' : 'Extração <b>automática</b>: pode juntar dados da pessoa errada, errar nomes ou deixar passar dados.'} Só os cartões marcados viram alvos, e <b>nada é salvo</b> até o último passo.</div>
-    <div class="sub" style="margin:0 4px 6px">${src.name ? `📄 <b>${esc(src.name)}</b>${src.pages ? ` · ${src.pages} pág.` : ''} · ` : R.mode === 'doc' ? `${cards.length} imagem(ns) · ` : '📋 Texto colado · '}${cards.length} pessoa(s) encontrada(s) · ${R.loose.length} dado(s) solto(s)</div>
+    ${R.exact ? afBadge({kind: R.exact.kind, persons: cards, ignored: R.exact.ignored}) : ''}
+    <div class="warn">${R.mode === 'doc' ? `Leitura <b>automática (OCR${R.cnhModel || cards.some(c => c.conf) ? ', por moldura de CNH' : ''})</b>: pode trocar letras e números. Confira cada cartão com a imagem.` : R.exact && R.exact.kind === 'cnh' ? 'Dados lidos <b>direto do texto do PDF</b> da CNH digital, pela posição dos rótulos. Confira mesmo assim (modelos de PDF variam).' : R.exact ? 'Os campos foram lidos <b>exatamente</b> como estão no texto — mas quem escreveu (a IA ou você) pode ter errado. Confira com o material original, principalmente CPF, datas e telefones.' : 'Extração <b>automática</b>: pode juntar dados da pessoa errada, errar nomes ou deixar passar dados.'} Só os cartões marcados viram alvos, e <b>nada é salvo</b> até o último passo.</div>
+    <div class="sub" style="margin:0 4px 6px">${src.name ? `📄 <b>${esc(src.name)}</b>${src.pages ? ` · ${src.pages} pág.` : ''} · ` : R.mode === 'doc' ? `${cards.length} imagem(ns) · ` : R.exact ? (R.exact.kind === 'cnh' ? '🪪 CNH digital · ' : '🤖 Formato ordenado · ') : '📋 Texto colado · '}${cards.length} pessoa(s) encontrada(s) · ${R.loose.length} dado(s) solto(s)</div>
     <label>Operação de destino</label><select id="ex_op">${exOpOptions(R.opId)}<option value="__new" ${R.opId === '__new' ? 'selected' : ''}>➕ Nova operação…</option></select>
     <div id="ex_nopw" class="${R.opId === '__new' ? '' : 'hidden'}"><label>Nome da nova operação</label><input id="ex_nop" value="${esc(R.newOp)}" placeholder="Ex.: Operação Aurora"></div>
     <h2>Pessoas (${cards.length}) <span class="sub" style="font-weight:400">· ${nInc} marcada(s)</span></h2>
@@ -3491,7 +3531,7 @@ function exReview(R) {
     q(d, '#ex_note').onclick = e => { R.keepNote = !R.keepNote; e.target.classList.toggle('on', R.keepNote); };
     d.querySelectorAll('.excard').forEach(el => {
       const c = cards.find(x => x.id === el.dataset.c);
-      el.querySelectorAll('[data-f]').forEach(inp => inp.oninput = () => { c[inp.dataset.f] = inp.value; if (inp.dataset.f === 'cpf') el.querySelector('.excpf').innerHTML = exCpfSt(inp.value); });
+      el.querySelectorAll('[data-f]').forEach(inp => inp.oninput = () => { c[inp.dataset.f] = inp.value; if (inp.dataset.f === 'cpf') { el.querySelector('.excpf').innerHTML = exCpfSt(inp.value); c.cpfWarn = !!_digits(inp.value) && !cpfValid(inp.value); const w = el.querySelector('.exwarn'); if (w) w.outerHTML = exCardWarn(c) || '<div class="exwarn hidden"></div>'; } });
       q(el, '.exinc').onchange = e => { c.inc = e.target.checked; el.classList.toggle('off', !c.inc); };
       const ki = q(el, '.exkimg'); if (ki) ki.onchange = e => c.keepImg = e.target.checked;
       q(el, '.exmenu').onchange = e => { const v = e.target.value; e.target.value = '';
@@ -3517,10 +3557,15 @@ function exReview(R) {
     };
   });
 }
+const exCardWarn = c => { const w = [];
+  if (_digits(c.cpf) && !cpfValid(c.cpf)) w.push(`⚠️ CPF ${_digits(c.cpf).length === 11 ? 'com dígitos verificadores que <b>não conferem</b>' : 'incompleto'} — mantido para você conferir`);
+  if (c.incerto) w.push('⚠️ Há leitura <b>incerta</b> — veja Observações');
+  return w.length ? `<div class="exwarn">${w.join('<br>')}</div>` : `<div class="exwarn hidden"></div>`; };
 const exCpfSt = v => { const d = _digits(v); return !d ? '' : d.length !== 11 ? '<span style="color:#ffadad">⚠️ precisa de 11 dígitos</span>' : cpfValid(d) ? '<span style="color:#7be3b0">✓ dígitos conferem</span>' : '<span style="color:#ffadad">⚠️ dígitos não conferem</span>'; };
 function exMergeCards(R, into, from) {
   ['nome', 'apelido', 'cpf', 'rg', 'nasc'].forEach(f => { if (from[f] && !into[f]) into[f] = from[f]; else if (from[f] && exKey(from[f]) !== exKey(into[f]) && f !== 'nome') R.loose.push(exItem(f === 'apelido' ? 'vulgo' : f, from[f])); });
   if (from.fil) exPut(into, exItem('fil', from.fil), R.loose);
+  (from.redes || '').split('\n').filter(Boolean).forEach(v => exPut(into, exItem('rede', v), R.loose)); (from.obs || '').split('\n').filter(Boolean).forEach(v => exPut(into, exItem('obs', v), R.loose)); if (from.incerto) into.incerto = true;
   from.tels.forEach(v => exPut(into, exItem('tel', v), R.loose)); from.veics.forEach(v => exPut(into, exItem('veic', v), R.loose)); from.ends.forEach(v => exPut(into, exItem('end', v), R.loose));
   if (!into.img && from.img) { into.img = from.img; into.keepImg = from.keepImg; } if (from.raw) into.raw = (into.raw ? into.raw + '\n\n---\n\n' : '') + from.raw;
   if (!into.papel) into.papel = from.papel; into.inc = true; R.cards.splice(R.cards.indexOf(from), 1);
@@ -3568,10 +3613,13 @@ async function exSave(R) {
   try {
     let opId = R.opId, newOp = false;
     if (opId === '__new') { const ex = S.ops.find(o => exKey(o.nome) === exKey(R.newOp)); if (ex) opId = ex.id; else { opId = uid(); S.ops.push({id: opId, nome: R.newOp.trim(), status: 'planejada', desc: '', ts: Date.now(), audios: [], vig: [], diario: [], trajetos: []}); newOp = true; } }
-    const src = R.src || {}, now = Date.now(), how = R.mode === 'doc' ? 'leitura de documento em lote' : 'extração de texto/documento';
+    const src = R.src || {}, now = Date.now(), isCnhe = !!(R.exact && R.exact.kind === 'cnh'), isCnhM = !!(R.mode === 'doc' && (R.cnhModel || R.cards.some(c => c.conf)));
+    const how = R.mode === 'doc' ? (isCnhM ? 'leitura de CNH por modelo (OCR)' : 'leitura de documento em lote') : isCnhe ? 'CNH digital em PDF — leitura exata' : R.exact ? 'formato ordenado (IA) — leitura exata' : 'extração de texto/documento';
+    const redesOf = c => String(c.redes || '').split('\n').map(x => x.trim()).filter(Boolean);
+    const obsNote = c => String(c.obs || '').trim() ? `🗒️ Observações ${isCnhe ? 'da CNH digital' : isCnhM ? 'da CNH (leitura por modelo)' : R.exact ? 'do formato ordenado (IA)' : 'da extração'}, conferidas:\n${String(c.obs).trim()}` : '';
     const noteTxt = c => { if (!R.keepNote) return '';
       const body = R.mode === 'doc' ? (c.raw || '') : (src.text || ''); if (!body.trim()) return '';
-      const head = R.mode === 'doc' ? `🪪 Texto lido do documento (OCR automático)${c.img ? ' — imagem: ' + (c.img.name || '') + ' · SHA-256 do arquivo: ' + c.img.hashOrig : ''}` : `📄 Texto de origem (extração automática, revisada)${src.name ? ` — arquivo: ${src.name} · SHA-256 do arquivo: ${src.hash}${src.edited ? ' (texto editado depois de carregado)' : ''}` : ` — texto colado · SHA-256: ${src.hash}`}`;
+      const head = R.mode === 'doc' ? `🪪 Texto lido do documento (OCR automático)${c.img ? ' — imagem: ' + (c.img.name || '') + ' · SHA-256 do arquivo: ' + c.img.hashOrig : ''}` : `📄 Texto de origem (${isCnhe ? 'CNH digital em PDF — leitura exata' : R.exact ? 'formato ordenado — leitura exata' : 'extração automática'}, revisada)${src.name ? ` — arquivo: ${src.name} · SHA-256 do arquivo: ${src.hash}${src.edited ? ' (texto editado depois de carregado)' : ''}` : ` — texto colado · SHA-256: ${src.hash}`}`;
       const max = 8000; return head + '\n\n' + (body.length > max ? body.slice(0, max) + `\n\n[… texto truncado: ${body.length} caracteres no total — o SHA-256 acima é do original]` : body); };
     const putDoc = async (a, c) => { if (!c.img || !c.keepImg) return false; if (a.docFoto) return false; const id = uid(); await putImg(id, new Uint8Array(c.img.bytes)); a.docFoto = {id, ts: Date.now(), hash: await sha256(c.img.bytes), hashOrig: c.img.hashOrig, arquivo: c.img.name || ''}; return true; };
     let nNew = 0, nMerge = 0;
@@ -3586,11 +3634,14 @@ async function exSave(R) {
         a.tels = a.tels || []; const nt = tels.filter(t => !a.tels.some(x => telKey(x) === telKey(t))); if (nt.length) { a.tels.push(...nt); done.push(nt.length + ' telefone(s)'); }
         if (c.papel && !(a.tags || []).some(t => exKey(t) === exKey(c.papel))) { a.tags = a.tags || []; a.tags.push(c.papel); }
         if (await putDoc(a, c)) done.push('foto do documento');
+        a.redes = a.redes || []; const nr = redesOf(c).filter(r => !a.redes.some(x => exKey(x) === exKey(r))); if (nr.length) { a.redes.push(...nr); done.push(nr.length + ' rede(s) social(is)'); }
+        const ob = obsNote(c); if (ob) { a.notas = a.notas || []; a.notas.push({id: uid(), ts: now, txt: ob}); done.push('observações (anotação)'); }
         const nt2 = noteTxt(c); if (nt2) { a.notas = a.notas || []; a.notas.push({id: uid(), ts: now, txt: nt2}); }
         a.log = a.log || []; a.log.push({ts: now, t: `Completado por ${how}${done.length ? ': ' + done.join(', ') : ' (nenhum campo vazio a preencher)'}`}); nMerge++;
       } else if (c.act === 'new' || !c.dup) {
-        const a = {id: uid(), opId, nome: c.nome.trim(), apelido: c.apelido.trim(), doc, nasc: c.nasc, filiacao: fil, prio: 'media', tels, veic, end, vinc: '', situacao: '', situacaoOutro: '', redes: [], mandados: [], tags: c.papel ? [c.papel] : [], fotos: [], locais: [], notas: [], audios: [], pend: [], log: [{ts: now, t: `Cadastrado por ${how} (conferido)`}], ts: now};
+        const a = {id: uid(), opId, nome: c.nome.trim(), apelido: c.apelido.trim(), doc, nasc: c.nasc, filiacao: fil, prio: 'media', tels, veic, end, vinc: '', situacao: '', situacaoOutro: '', redes: redesOf(c), mandados: [], tags: c.papel ? [c.papel] : [], fotos: [], locais: [], notas: [], audios: [], pend: [], log: [{ts: now, t: `Cadastrado por ${how} (conferido)`}], ts: now};
         S.alvos.push(a); if (await putDoc(a, c)) a.log.push({ts: now, t: 'Foto do documento registrada (leitura em lote)'});
+        const ob = obsNote(c); if (ob) a.notas.push({id: uid(), ts: now, txt: ob});
         const nt2 = noteTxt(c); if (nt2) a.notas.push({id: uid(), ts: now, txt: nt2}); nNew++;
       }
     }
@@ -3686,15 +3737,17 @@ function docBatchUI(opId) {
     ${n ? `<div class="thumbs" id="dq_th">${Q.files.map((x, i) => `<div class="th" data-i="${i}"><img src="${x.url}"><span class="g">✕</span></div>`).join('')}</div>` : '<div class="empty" style="padding:16px"><div>🪪</div>Nenhuma imagem na fila.</div>'}
     <div class="grid2" style="margin-top:12px"><div class="btn" id="dq_cam">📷 Fotografar</div><div class="btn" id="dq_alb">🖼️ Escolher várias</div></div>
     <div class="sub" style="margin:8px 4px 0">Boa luz, documento plano e sem reflexo. Toque numa miniatura para tirar da fila.</div>
+    <div class="tgrow card glass" style="cursor:default;margin:12px 0 0"><div>🪪 Ler como CNH (modelo)<div class="sub">lê cada campo na posição da CNH — use fotos <b>recortadas no cartão</b>, de frente</div></div><div class="tg ${Q.cnh ? 'on' : ''}" id="dq_cnh"></div></div>
     <div class="gap"></div><div class="btn pri ${n ? '' : 'dis'}" id="dq_go">${n ? `Ler ${n} documento(s)` : 'Adicione imagens'}</div>`, s => {
     s.querySelectorAll('#dq_th .th').forEach(t => t.onclick = () => { const x = Q.files.splice(+t.dataset.i, 1)[0]; URL.revokeObjectURL(x.url); docBatchUI(Q.opId); });
     const add = fs => { fs.forEach(f => Q.files.push({f, url: URL.createObjectURL(f)})); docBatchUI(Q.opId); };
     s.querySelector('#dq_cam').onclick = () => { const inp = $('#cam'); inp.value = ''; hold(180000); inp.oncancel = () => release(); inp.onchange = () => { release(); const f = inp.files[0]; if (f) add([f]); }; inp.click(); };
     s.querySelector('#dq_alb').onclick = () => pickFile('image/*', fs => add(fs), true);
-    s.querySelector('#dq_go').onclick = () => { if (!Q.files.length) return toast('Adicione imagens dos documentos'); const fs = Q.files.map(x => x.f); Q.files.forEach(x => URL.revokeObjectURL(x.url)); DOCQ = null; docBatchRun(fs, Q.opId); };
+    s.querySelector('#dq_cnh').onclick = e => { Q.cnh = !Q.cnh; e.target.classList.toggle('on', Q.cnh); };
+    s.querySelector('#dq_go').onclick = () => { if (!Q.files.length) return toast('Adicione imagens dos documentos'); const fs = Q.files.map(x => x.f); Q.files.forEach(x => URL.revokeObjectURL(x.url)); DOCQ = null; docBatchRun(fs, Q.opId, [], 0, !!Q.cnh); };
   });
 }
-async function docBatchRun(files, opId, cards = [], start = 0) {
+async function docBatchRun(files, opId, cards = [], start = 0, cnhMode = false) {
   // Cancelar pausa a fila: dá para continuar de onde parou (mesmo leitor recriado) ou conferir o que já foi lido
   const n = files.length; let cancel = false, cancelRes, next = start; const cancelP = new Promise(r => cancelRes = r);
   sheet(`<h2 style="margin-top:0">🪪 Lendo documentos…</h2><div class="t" id="db_n" style="margin:0 4px">Documento ${start + 1} de ${n}</div><div class="sub" id="db_st" style="margin:4px 4px 0">Preparando…</div><div class="prog"><i id="db_bar" style="width:${Math.round(start / n * 100)}%"></i></div>
@@ -3705,7 +3758,13 @@ async function docBatchRun(files, opId, cards = [], start = 0) {
     const nEl = $('#db_n'), sEl = $('#db_st'); if (nEl) nEl.textContent = `Documento ${i + 1} de ${n}`; if (sEl) sEl.textContent = 'Preparando…';
     const prog = m => { if (cancel) return; const st = $('#db_st'), bar = $('#db_bar'); if (st) st.textContent = ocrStepTxt(m) + (m.status === 'recognizing text' ? ` ${Math.round((m.progress || 0) * 100)}%` : ''); if (bar) bar.style.width = Math.round(((i + (m.status === 'recognizing text' ? .3 + .7 * (m.progress || 0) : .3 * (m.progress || 0))) / n) * 100) + '%'; };
     try {
-      li = await loadImg(file); if (cancel) break; const cv = ocrCanvas(li.img, null, 2000);
+      li = await loadImg(file); if (cancel) break;
+      if (cnhMode) { // v0.8: CNH por modelo (zonas) — a foto deve estar recortada no cartão
+        const r = await Promise.race([cnhReadCanvas(canvasOf(li.img, 1800), m => prog(m)), cancelP]); if (r === 'cancel' || cancel || !r) break;
+        const bytes = await resizeJpeg(file, 2000), c = cnhCardOf(r, bytes, new Blob([bytes], {type: 'image/jpeg'}), file.name || `cnh_${i + 1}.jpg`); c.img.hashOrig = await sha256(await file.arrayBuffer()); cards.push(c); next = i + 1;
+        const dn0 = $('#db_done'); if (dn0) dn0.textContent = `${cards.length} lido(s) até agora`; continue;
+      }
+      const cv = ocrCanvas(li.img, null, 2000);
       let data = await Promise.race([runOcr(cv, {tessedit_pageseg_mode: '3'}, prog), cancelP]); if (data === 'cancel') break;
       let ex = extractDoc(data.text);
       if (!ex.nome && !ex.cpfs.length) { const d2 = await Promise.race([runOcr(cv, {tessedit_pageseg_mode: '11'}, prog), cancelP]); if (d2 === 'cancel') break; const e2 = extractDoc(d2.text); if (e2.nome || e2.cpfs.length) { data = d2; ex = e2; } }
@@ -3725,7 +3784,7 @@ async function docBatchRun(files, opId, cards = [], start = 0) {
       <div class="btn pri" id="dp_go" style="margin-top:16px">▶️ Continuar a leitura (${rest} restante${rest > 1 ? 's' : ''})</div>
       <div class="btn ${cards.length ? '' : 'dis'}" id="dp_rev" style="margin-top:10px">Conferir os ${cards.length} lido(s)${rest ? ' e descartar o resto' : ''}</div>
       <div class="btn dan" id="dp_x" style="margin-top:10px">Descartar tudo</div>`, s => {
-      s.querySelector('#dp_go').onclick = () => docBatchRun(files, opId, cards, next);
+      s.querySelector('#dp_go').onclick = () => docBatchRun(files, opId, cards, next, cnhMode);
       s.querySelector('#dp_rev').onclick = () => { if (!cards.length) return toast('Nenhum documento lido ainda'); closeSheet(); EX_SEQ_PANEL++; exReview({mode: 'doc', cards, loose: [], src: {}, opId: exDefOp(opId), newOp: '', keepNote: false}); };
       s.querySelector('#dp_x').onclick = () => { closeSheet(); EX_URLS.forEach(u => URL.revokeObjectURL(u)); EX_URLS = []; toast('Leitura descartada'); };
     });
@@ -3734,6 +3793,466 @@ async function docBatchRun(files, opId, cards = [], start = 0) {
   if (!cards.length) return toast('Nenhum documento pôde ser lido');
   EX_SEQ_PANEL++; exReview({mode: 'doc', cards, loose: [], src: {}, opId: exDefOp(opId), newOp: '', keepNote: false});
 }
+/* ============ v0.8 (parte A) — Formato ordenado com IA (leitura exata) e rótulos “Campo: valor” — by @aiforge.team ============ */
+/* Formato ordenado: uma pessoa por linha (campos “CHAVE: valor” separados por |), ou um bloco de linhas “CHAVE: valor” por pessoa
+   (separadas por linha em branco ou ---), ou uma lista JSON com as mesmas chaves. Leitura exata: nada é adivinhado. */
+const AF_MAP = {nome: 'nome', 'nome completo': 'nome', qualificado: 'nome', qualificada: 'nome',
+  vulgo: 'vulgo', vulgos: 'vulgo', alcunha: 'vulgo', apelido: 'vulgo', apelidos: 'vulgo',
+  cpf: 'cpf', 'cpf/mf': 'cpf',
+  rg: 'rg', identidade: 'rg', 'rg/orgao': 'rg', 'rg/orgao emissor': 'rg', 'documento de identidade': 'rg', 'doc identidade': 'rg', 'carteira de identidade': 'rg', 'registro geral': 'rg',
+  'orgao emissor': 'rgorg', 'orgao expedidor': 'rgorg', emissor: 'rgorg', 'rg orgao': 'rgorg', 'rg uf': 'rgorg',
+  nasc: 'nasc', nascimento: 'nasc', 'data de nascimento': 'nasc', 'data nascimento': 'nasc', 'data de nasc': 'nasc', 'data nasc': 'nasc', dn: 'nasc', 'nascido em': 'nasc', 'nascida em': 'nasc',
+  mae: 'mae', 'nome da mae': 'mae', genitora: 'mae', pai: 'pai', 'nome do pai': 'pai', genitor: 'pai', filiacao: 'fil',
+  endereco: 'end', enderecos: 'end', 'endereco residencial': 'end', residencia: 'end', domicilio: 'end',
+  telefones: 'tel', telefone: 'tel', tel: 'tel', tels: 'tel', fone: 'tel', fones: 'tel', celular: 'tel', celulares: 'tel', whatsapp: 'tel', contato: 'tel', contatos: 'tel',
+  veiculo: 'veic', veiculos: 'veic', placa: 'placa', placas: 'placa',
+  redes: 'redes', 'redes sociais': 'redes', 'rede social': 'redes', instagram: 'rede:Instagram', facebook: 'rede:Facebook', tiktok: 'rede:TikTok', 'e-mail': 'rede:E-mail', email: 'rede:E-mail',
+  obs: 'obs', observacao: 'obs', observacoes: 'obs',
+  naturalidade: 'nat', 'natural de': 'nat', profissao: 'prof', ocupacao: 'prof', papel: 'papel'};
+const afKeyNorm = k => _norm(k).replace(/\*+/g, '').replace(/\.(?=\S)/g, '').replace(/\.$/, '').replace(/\s*\/\s*/g, '/').replace(/[\s_]+/g, ' ').trim();
+const AF_NA = /^(?:-+|—+|\?+|n\/?[ad]|nao (?:consta|informad[oa]|declarad[oa]|identificad[oa]|possui|ha|tem)|ignorad[oa]|desconhecid[oa]|sem informac(?:ao|oes)|nenhum[a]?|null|undefined|vazio)\.?$/;
+const afNA = v => AF_NA.test(_norm(v).replace(/\s+/g, ' '));
+/* “CHAVE: valor” (aceita marcador de lista, **negrito** do markdown e aspas) → {f, k, v} ou null */
+function afSeg(s) {
+  const m = String(s).match(/^\s*(?:[-*•]\s+|\d{1,2}[.)]\s+)?\**\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .\/_-]{0,32}?)\s*\**\s*:\s*\**\s*(.*?)\s*\**\s*$/);
+  if (!m) return null; const f = AF_MAP[afKeyNorm(m[1])]; if (!f) return null;
+  return {f, k: m[1].replace(/\*/g, '').trim(), v: m[2].replace(/^["“']|["”']$/g, '').trim()};
+}
+const AF_INLINE = /[,;]\s*(?:nome|cpf|rg|vulgo|alcunha|telefone|celular|endere[çc]o|m[ãa]e|pai|nascimento|placa|ve[íi]culo)\s*:/i;
+const afIsSep = l => /^\s*(?:-{3,}|_{3,}|\*{3,}|={3,}|#{1,6}\s.*|`{3}.*|\**\s*(?:pessoa|indiv[íi]duo|envolvid[oa]|alvo|registro)\s*(?:n[º°o.]*\s*)?\d{0,3}\s*\**\s*:?\s*\**|\d{1,3}\s*[.)º°]?)\s*$/i.test(l); // separadores e cabeçalhos “Pessoa 1:”
+/* classifica a linha: {segs} se for linha do formato (1ª parte com chave conhecida e a maioria das partes com chave) */
+function afLine(line) {
+  const parts = line.split('|').map(x => x.trim()).filter(Boolean); if (!parts.length) return null;
+  const segs = parts.map(afSeg); if (!segs[0] || segs.filter(Boolean).length * 2 < parts.length) return null;
+  if (parts.length === 1 && AF_INLINE.test(segs[0].v)) return null; // “Nome: X, CPF: Y” = texto semiestruturado → extração por rótulos
+  const out = []; parts.forEach((p, i) => { if (segs[i]) out.push(segs[i]); else out[out.length - 1].v += '; ' + p; });
+  return out;
+}
+function afStripFences(t) { return String(t || '').replace(/^\s*```[a-z]*\s*\n?/i, '').replace(/\n?\s*```\s*$/, '').trim(); }
+/* detecção rápida (também usada para o selo ao colar) → null ou {kind, persons:[[{f,k,v}]], ignored} */
+function afDetect(text) {
+  const T = exClean(text).trim(); if (!T) return null;
+  if (/^nenhuma pessoa\.?$/i.test(T)) return {kind: 'none', persons: [], ignored: 0};
+  const J = afStripFences(T);
+  if (/^[\[{]/.test(J)) { try { const r = afJson(JSON.parse(J)); if (r) return r; } catch (e) { /* não é JSON válido: segue como texto */ } }
+  const lines = T.split('\n'); let keyL = 0, other = 0, nomes = 0, multi = 0, inline = 0;
+  const parsed = lines.map(l => { if (!l.trim() || afIsSep(l)) return 'sep'; const s = afLine(l); if (s) { keyL++; if (s.length > 1) multi++; nomes += s.filter(x => x.f === 'nome').length; } else { other++; if (AF_INLINE.test(l)) inline++; } return s; });
+  // linhas com | : a maioria das linhas no formato; blocos “CAMPO: valor”: quase tudo no formato (até 2 linhas soltas, ex.: “Aqui estão os dados:”)
+  // texto com rótulos no meio de frases (“Nome: X, CPF: Y”) fica com a extração por rótulos, que entende prosa
+  if (!nomes || inline) return null;
+  if (multi ? keyL < (keyL + other) * .6 : keyL < 2 || other > Math.max(2, Math.floor(keyL * .1))) return null;
+  const persons = []; let cur = null, last = null, ignored = 0;
+  const flush = () => { if (cur && cur.length) persons.push(cur); cur = null; last = null; };
+  parsed.forEach((s, i) => {
+    if (s === 'sep') return flush();
+    if (s) {
+      if (s.length > 1) { flush(); persons.push(s); return; }
+      const x = s[0]; if (!cur) cur = []; if (x.f === 'nome' && cur.some(y => y.f === 'nome')) { flush(); cur = []; }
+      cur.push(x); last = x; return;
+    }
+    const l = lines[i].trim();
+    if (cur && last) { if (/^[^:]{2,30}:\s*\S/.test(l)) cur.push({f: 'obs', k: '', v: l}); else last.v += (last.f === 'obs' || last.f === 'end' ? ' ' : '; ') + l; }
+    else ignored++;
+  });
+  flush();
+  return {kind: multi ? 'linhas' : 'blocos', persons, ignored};
+}
+function afJson(j) {
+  let arr = Array.isArray(j) ? j : j && typeof j === 'object' ? (Object.values(j).find(Array.isArray) || [j]) : null;
+  if (!arr || !arr.length || !arr.every(o => o && typeof o === 'object' && !Array.isArray(o))) return null;
+  const val = v => Array.isArray(v) ? v.map(val).filter(Boolean).join('; ') : v && typeof v === 'object' ? Object.entries(v).map(([a, b]) => a + ': ' + val(b)).join('; ') : v == null ? '' : String(v);
+  const persons = arr.map(o => Object.entries(o).map(([k, v]) => { const f = AF_MAP[afKeyNorm(k)]; return f ? {f, k, v: val(v).trim()} : {f: 'obs', k: '', v: k + ': ' + val(v)}; }));
+  if (!persons.some(p => p.some(x => x.f === 'nome'))) return null;
+  return {kind: 'JSON', persons, ignored: 0};
+}
+const AF_MES = {jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6, jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12};
+function exDateISO(s) { // dd/mm/aaaa, dd.mm.aa, aaaa-mm-dd, “12 de março de 1990” → aaaa-mm-dd ou ''
+  const t = _norm(s); let d, mo, y, m;
+  if ((m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) [y, mo, d] = [m[1], +m[2], +m[3]];
+  else if ((m = t.match(/(\d{1,2})\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-]\s*(\d{2}|\d{4})(?!\d)/))) [d, mo, y] = [+m[1], +m[2], m[3]];
+  else if ((m = t.match(/(\d{1,2})\s*(?:º|o)?\s+de\s+([a-zç]{3})[a-zç]*\s+de\s+(\d{4})/))) [d, mo, y] = [+m[1], AF_MES[m[2]], m[3]];
+  else return '';
+  if (String(y).length === 2) y = (+y > new Date().getFullYear() % 100 ? '19' : '20') + y;
+  const ok = mo >= 1 && mo <= 12 && d >= 1 && d <= new Date(+y, mo, 0).getDate() && +y >= 1900 && +y <= new Date().getFullYear();
+  return ok ? `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '';
+}
+const exNameFix = s => { const v = String(s || '').replace(/[^A-Za-zÀ-ÿ' \-]+/g, ' ').replace(/\s+/g, ' ').trim(); return v && (v === v.toUpperCase() || v === v.toLowerCase()) ? titleName(v) : v; };
+const exPlateClean = p => { const s = String(p).toUpperCase().replace(/[^A-Z0-9]/g, ''); return /^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(s) ? plateFmt(s) : String(p).trim(); };
+const exTelClean = t => { const d = exPhoneDigits(t); return d ? exPhoneFmt(d) : String(t).trim(); };
+const AF_UNC = /\(\s*(?:incert[oa]|duvidos[oa]|ileg[íi]vel|\?)\s*\)|\?{1,3}$/i;
+/* uma pessoa do formato → cartão de conferência (mesmo cartão da extração v0.7) */
+function afCard(pairs, loose) {
+  const c = exCard({lab: true, exact: true}), obs = [], veics = [], plates = [], fil = {mae: [], pai: [], fil: []}; let rgorg = '';
+  for (const p of pairs) {
+    let v = String(p.v || '').replace(/\s+/g, ' ').trim(); if (!v || afNA(v)) continue;
+    if (p.f !== 'obs' && AF_UNC.test(v)) { c.incerto = true; obs.push(`⚠️ ${p.k || p.f} com leitura incerta: ${v}`); v = v.replace(AF_UNC, '').trim(); if (!v || /[?]/.test(v)) continue; }
+    const list = s => s.split(/\s*;\s*|\n/).map(x => x.trim()).filter(x => x && !afNA(x));
+    switch (p.f.split(':')[0]) {
+      case 'nome': exPut(c, exItem('nome', exNameFix(v)), loose); break;
+      case 'vulgo': exPut(c, exItem('vulgo', v.replace(/^["“']|["”']$/g, '')), loose); break;
+      case 'cpf': { const d = _digits(v), ok = d.length === 11 && cpfValid(d); exPut(c, exItem('cpf', d.length === 11 ? cpfFmt(d) : v, ok), loose); if (!ok) c.cpfWarn = true; break; }
+      case 'rg': exPut(c, exItem('rg', v.replace(/\s*-\s*(?=[A-Z]{2,8}\b)/, ' ').replace(/\b([A-Z]{2,8})\s*[-\s]\s*([A-Z]{2})$/, '$1/$2')), loose); break;
+      case 'rgorg': rgorg = v.toUpperCase().replace(/\s*[-\s]\s*/g, '/'); break;
+      case 'nasc': { const iso = exDateISO(v); if (iso) exPut(c, exItem('nasc', iso), loose); else obs.push('Nascimento (não reconhecido): ' + v); break; }
+      case 'mae': case 'pai': fil[p.f].push(exNameFix(v)); break;
+      case 'fil': fil.fil.push(...v.split(/\s*[\/;]\s*/).map(exNameFix).filter(Boolean)); break;
+      case 'end': list(v).forEach(x => exPut(c, exItem('end', x), loose)); break;
+      case 'tel': v.split(/\s*[;,\/]\s*|\s+e\s+|\s+ou\s+/).map(x => x.trim()).filter(x => _digits(x).length >= 8).forEach(x => exPut(c, exItem('tel', exTelClean(x)), loose)); break;
+      case 'veic': veics.push(...list(v)); break;
+      case 'placa': plates.push(...v.split(/\s*[;,\/]\s*|\s+e\s+/).map(x => x.trim()).filter(Boolean)); break;
+      case 'redes': c.redes = [c.redes, ...list(v)].filter(Boolean).join('\n'); break;
+      case 'rede': c.redes = [c.redes, p.f.split(':')[1] + ': ' + v].filter(Boolean).join('\n'); break;
+      case 'nat': obs.push('Naturalidade: ' + v); break;
+      case 'prof': obs.push('Profissão: ' + v); break;
+      case 'papel': c.papel = _norm(v) === 'vitima' ? 'vítima' : v.toLowerCase(); break;
+      default: obs.push(v);
+    }
+  }
+  if (rgorg) { if (c.rg && !/[A-Za-z]/.test(c.rg)) c.rg += ' ' + rgorg; else if (!c.rg) obs.push('Órgão emissor do RG: ' + rgorg); }
+  const fl = [...fil.mae, ...fil.pai, ...fil.fil].filter(Boolean); if (fl.length) exPut(c, exItem('fil', fl.join('\n')), loose);
+  // placa(s) + veículo(s): um veículo e uma placa viram “Fiat Uno prata ABC1D23”; o resto fica em itens separados
+  const pl = plates.map(exPlateClean), vs = veics.slice();
+  if (vs.length === 1 && pl.length >= 1 && !platesIn(vs[0]).length) { exPut(c, exItem('veic', vs[0] + ' ' + pl[0]), loose); pl.slice(1).forEach(x => exPut(c, exItem('veic', x), loose)); }
+  else { vs.forEach(x => exPut(c, exItem('veic', x), loose)); pl.forEach(x => { if (!c.veics.some(y => platesIn(y)[0] && platesIn(y)[0] === platesIn(x)[0])) exPut(c, exItem('veic', x), loose); }); }
+  c.obs = [c.obs, ...obs].filter(Boolean).join('\n'); if (/incert/i.test(c.obs)) c.incerto = true;
+  c.inc = true; return c;
+}
+function afParse(text) {
+  const d = afDetect(text); if (!d) return null; const loose = [];
+  return {cards: d.persons.map(p => afCard(p, loose)), loose, text: exClean(text), exact: {kind: d.kind, n: d.persons.length, ignored: d.ignored}};
+}
+
+/* instrução para colar numa IA (o app não envia nada: o usuário copia e decide onde usar) */
+const AF_PROMPT = `Você vai extrair dados de pessoas para um cadastro. Leia com atenção o material que estou enviando (texto colado, foto de documento como RG ou CNH, print ou PDF) e liste TODAS as pessoas mencionadas.
+
+REGRAS
+1. Responda SOMENTE com as linhas no formato abaixo. Não escreva introdução, comentário, explicação, tabela, markdown nem bloco de código.
+2. Uma pessoa por linha. Os campos são separados por " | " e cada campo é escrito como CHAVE: valor.
+3. Use somente estas chaves, nesta ordem: NOME | VULGO | CPF | RG | NASC | MÃE | PAI | NATURALIDADE | PROFISSÃO | ENDEREÇO | TELEFONES | VEÍCULO | PLACA | REDES | PAPEL | OBS
+4. NUNCA invente, complete ou deduza dados. Se uma informação não aparece no material, omita a chave inteira (não escreva "não informado", "N/D" nem deixe a chave vazia).
+5. Padronize assim:
+   - NOME: nome completo, sem abreviar e sem títulos (Sr., Dr.).
+   - CPF: 000.000.000-00. Copie os números exatamente como estão, mesmo que pareçam inválidos.
+   - RG: número seguido do órgão emissor e UF, se houver (ex.: 2004010123456 SSP/CE).
+   - NASC: dd/mm/aaaa.
+   - MÃE e PAI: nomes completos da filiação.
+   - TELEFONES: (DD) 90000-0000; vários separados por "; ".
+   - VEÍCULO: marca, modelo e cor (ex.: Fiat Uno prata).
+   - PLACA: ABC1D23 (Mercosul) ou ABC-1234 (antiga); várias separadas por "; ".
+   - ENDEREÇO: logradouro, número, complemento, bairro, cidade/UF; vários separados por "; ".
+   - REDES: perfis ou links (ex.: Instagram @perfil); vários separados por "; ".
+   - PAPEL: autor, vítima, testemunha, conduzido, suspeito ou investigado, só quando o material disser.
+6. Se uma leitura estiver duvidosa (foto ruim, letra ilegível, número cortado), NÃO coloque no campo próprio: escreva em OBS seguida de "(incerto)". Exemplo: OBS: CPF 123.456.789-0? (incerto)
+7. Outras informações úteis sobre a pessoa (tatuagens, sinais, local de trabalho, facção, antecedentes citados) vão em OBS, de forma curta.
+8. Não use o caractere "|" dentro dos valores.
+9. Se o material for foto de documento, leia todos os campos visíveis do documento.
+10. Se não houver nenhuma pessoa no material, responda apenas: NENHUMA PESSOA
+
+EXEMPLO DE RESPOSTA
+NOME: João Carlos da Silva | VULGO: Jota | CPF: 529.982.247-25 | RG: 2004010123456 SSP/CE | NASC: 15/03/1990 | MÃE: Maria Aparecida da Silva | PAI: José Carlos da Silva | ENDEREÇO: Rua das Flores, 123, Centro, Fortaleza/CE | TELEFONES: (85) 98877-6655; (85) 3222-1100 | VEÍCULO: Fiat Uno prata | PLACA: ABC1D23 | REDES: Instagram @jota_ce | PAPEL: investigado | OBS: tatuagem de carpa no braço direito
+NOME: Ana Paula Ferreira | NASC: 02/11/1995 | TELEFONES: (85) 99911-2233 | OBS: CPF 123.456.789-0? (incerto)
+
+MATERIAL:
+`;
+async function copyText(t) {
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(t); return true; } } catch (e) { /* cai no método antigo */ }
+  const ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+  document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, t.length); let ok = false; try { ok = document.execCommand('copy'); } catch (e) {} ta.remove(); return ok;
+}
+const afBadge = d => d && d.kind === 'cnh' ? `<div class="exok">🪪 <b>CNH digital reconhecida</b><div class="sub">campos lidos pela posição dos rótulos no PDF (camada de texto) — leitura exata</div></div>` : d ? (d.kind === 'none' ? `<div class="exok none">🤖 A resposta diz <b>NENHUMA PESSOA</b> — não há o que importar.</div>` : `<div class="exok">✅ <b>Formato ordenado reconhecido — leitura exata</b><div class="sub">${d.persons.length} pessoa(s) · ${({linhas: 'uma por linha', blocos: 'blocos CAMPO: valor', JSON: 'JSON'})[d.kind] || d.kind}${d.ignored ? ` · ${d.ignored} linha(s) fora do formato ignorada(s)` : ''}</div></div>`) : '';
+
+/* ---- rótulos “Campo: valor” (relatórios/ofícios), em qualquer ordem, inline ou um por linha ---- */
+const EXL_UF = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ');
+const EXL_DEFS = [ // ordem importa: rótulos mais longos/específicos antes
+  ['mae', 'nome\\s+da\\s+m[ãa]e|m[ãa]e|genitora'], ['pai', 'nome\\s+do\\s+pai|pai|genitor'], ['fil', 'filia[çc][ãa]o'],
+  ['rgorg', '[óo]rg[ãa]o\\s+(?:emissor|expedidor)|emissor|expedidor'],
+  ['nasc', 'data\\s+de\\s+nascimento|data\\s+(?:de\\s+)?nasc\\.?|nascimento|nascid[oa]\\s+em|nasc\\.?|d\\.?\\s?n\\.?'],
+  ['nome', 'nome\\s+completo|nome|qualificad[oa]|qualifica[çc][ãa]o'],
+  ['role', 'autor[a]?|v[ií]tima|testemunha|conduzid[oa]|suspeit[oa]|investigad[oa]|envolvid[oa]|abordad[oa]|preso|presa'],
+  ['vulgo', 'vulgo|alcunha|apelido|conhecid[oa]\\s+(?:como|por)'],
+  ['cpf', 'c\\.?\\s?p\\.?\\s?f\\.?(?:\\s*\\/\\s*mf)?'],
+  ['rg', 'doc(?:umento)?\\.?\\s+(?:de\\s+)?identidade|c[ée]dula\\s+de\\s+identidade|carteira\\s+de\\s+identidade|registro\\s+geral|identidade|r\\.?\\s?g\\.?'],
+  ['end', 'endere[çc]o(?:\\s+residencial)?|resid[êe]ncia|residente(?:\\s+e\\s+domiciliad[oa])?|domic[íi]lio|domiciliad[oa]'],
+  ['tel', 'telefones?|tel\\.?|fones?|celular(?:es)?|cel\\.?|contatos?|whats(?:app)?|zap'],
+  ['placa', 'placas?'], ['veic', 've[íi]culos?|carro|moto(?:cicleta)?'],
+  ['nat', 'naturalidade|natural\\s+de'], ['prof', 'profiss[ãa]o|ocupa[çc][ãa]o'],
+  ['rede', 'redes?\\s+sociais|redes|instagram|facebook|e-?mail']];
+const EXL_RE = new RegExp(`(^|[\\n,;|(•]|\\s[-–]\\s|\\.\\s)[ \\t]*(?:\\d{1,2}[.)º°]?[ \\t]*[-–]?[ \\t]*)?(?:${EXL_DEFS.map(([, s]) => `(${s})`).join('|')})(?:[ \\t]*\\d{1,2})?[ \\t]*(?:n[º°o.]+[ \\t]*)?:[ \\t]*`, 'gim');
+const EXL_NEXT = new RegExp(`(?:[,;.]|\\s[-–])?\\s*\\b(?:${EXL_DEFS.map(([, s]) => s).join('|')})(?:[ \\t]*\\d{1,2})?[ \\t]*(?:n[º°o.]+[ \\t]*)?:`, 'i');
+const EX_ABBR = new Set('av r rua trav tv al rod pca pc est n no nº apto ap bl qd q lt cj conj res sr sra dr dra prof profa sto sta s km cond ed jd jdm vl pq fl fls dist mun br'.split(' '));
+/* fim do valor rotulado: quebra de linha, ; ou |, próximo “Rótulo:”, fim de frase (sem cortar “Av. Bezerra”); nomes param também na vírgula */
+function exlCut(s, f) {
+  let k = s.length; const hit = i => { if (i >= 0 && i < k) k = i; };
+  hit(s.search(/\n|;|\|/)); const nx = s.match(EXL_NEXT); if (nx) hit(nx.index);
+  const re = /(\S+)\.\s+(?=[A-ZÀ-Ú])/g; let m; while ((m = re.exec(s)) && m.index < k) { if (!EX_ABBR.has(_norm(m[1]).replace(/[^a-z0-9º]/g, '')) && !/^[A-Z]$/.test(m[1])) { hit(m.index + m[1].length); break; } }
+  if (f === 'nome' || f === 'role' || f === 'mae' || f === 'pai' || f === 'vulgo' || f === 'nat' || f === 'prof') hit(s.search(/[,(]|\s[-–]\s|\b(?:brasileir[oa]|solteir[oa]|casad[oa]|divorciad[oa]|vi[úu]v[oa]|portador[a]?|inscrit[oa]|nascid[oa]|natural|residente|filh[oa]\s+de|vulgo|cpf|rg)\b/i));
+  if (f === 'nasc') { const m2 = s.match(/^[^\n]*?\b(?:\d{1,2}\s*[\/.\-]\s*\d{1,2}\s*[\/.\-]\s*\d{2,4}|\d{1,2}\s*(?:º\s*)?de\s+[a-zç]+\s+de\s+\d{4}|\d{4}-\d{2}-\d{2})/i); hit(m2 ? m2[0].length : 0); }
+  return Math.max(0, Math.min(k, 260));
+}
+/* passa pelo texto achando “Rótulo: valor”; devolve entidades {k, v, i, lab:true}, âncoras de nome rotuladas e os trechos a mascarar */
+function exLabeled(T) {
+  const ents = [], anchors = [], spans = []; EXL_RE.lastIndex = 0; let m;
+  while ((m = EXL_RE.exec(T))) {
+    const gi = m.slice(2).findIndex(x => x !== undefined); if (gi < 0) continue; const f = EXL_DEFS[gi][0], lab = m[gi + 2];
+    const vs = m.index + m[0].length, raw = T.slice(vs, vs + 300), k = exlCut(raw, f); let v = raw.slice(0, k).replace(/[\s,.;:\-–]+$/, '').replace(/\s+/g, ' ').trim();
+    const i0 = m.index + m[1].length; let used = k; EXL_RE.lastIndex = vs + k;
+    if (!v || afNA(v)) { spans.push([i0, vs + k]); continue; }
+    const put = (kk, vv, extra) => ents.push(Object.assign({k: kk, v: vv, i: i0, lab: true}, extra || {}));
+    const upto = n => { used = Math.min(k, raw.slice(0, k).length - raw.slice(0, k).trimStart().length + n); EXL_RE.lastIndex = vs + used; }; // só o trecho realmente usado é mascarado
+    if (f === 'nome' || f === 'role') { const nm = exNameFix(v); if (nm.replace(/[^A-Za-zÀ-ÿ]/g, '').length < 3 || EX_STOP.has(exUp(nm.split(' ')[0])) && nm.split(' ').length < 2) continue;
+      const role = f === 'role' ? ((EX_ROLE.find(([, re]) => re.test(lab)) || [])[0] || (/pres[oa]|abordad/i.test(lab) ? 'conduzido' : '')) : ''; anchors.push({i: i0, nome: nm, lab: true, fl: true, role}); }
+    else if (f === 'vulgo') put('vulgo', v.replace(/^["“'‘«]|["”'’»]$/g, ''));
+    else if (f === 'cpf') { const nm = v.match(/^\d[\d.\s\-\/]*\d/); if (!nm) continue; const d = _digits(nm[0]); if (d.length < 9 || d.length > 11) continue; put('cpf', d.length === 11 ? cpfFmt(d) : nm[0], {ok: d.length === 11 && cpfValid(d)}); upto(nm[0].length); }
+    else if (f === 'rg') { const n = v.match(/^((?:\d[\d.\s]*\d|\d)(?:\s?-\s?[\dXx])?)/); if (!n) continue; const rest = v.slice(n[0].length);
+      const o = rest.match(/^[\s,\-–\/(]*([A-Z]{2,8})(?:\s*[-\/\s]\s*([A-Z]{2}))?\b\)?/); let org = o && (o[1] !== 'UF' || o[2]) ? (o[2] && EXL_UF.includes(o[2]) ? o[1] + '/' + o[2] : o[1]) : '';
+      if (org && EXL_UF.includes(org) && !o[2]) org = ''; put('rg', n[1].replace(/\s/g, '') + (org ? ' ' + org : '')); upto(n[0].length + (org ? o[0].length : 0)); }
+    else if (f === 'rgorg') { const o = v.match(/^([A-Z]{2,8})(?:\s*[-\/\s]\s*([A-Z]{2}))?/i); if (!o) continue; put('rgorg', o[1].toUpperCase() + (o[2] ? '/' + o[2].toUpperCase() : '')); upto(o[0].length); }
+    else if (f === 'nasc') { const iso = exDateISO(v); if (iso) put('nasc', iso); }
+    else if (f === 'mae' || f === 'pai') { const nm = exNameFix(v); if (nm.split(' ').length >= 2) put('fil', nm, {fo: f}); }
+    else if (f === 'fil') { const st = v.search(/,?\s*\b(?:brasileir[oa]|solteir[oa]|casad[oa]|divorciad[oa]|portador[a]?|inscrit[oa]|nascid[oa]|natural|residente|domiciliad[oa]|cpf|rg|vulgo)\b/i), vv = st > 0 ? v.slice(0, st) : v; if (st > 0) upto(st);
+      const ps = vv.split(/\s+e\s+|\s*[\/;,]\s*/).map(exNameFix).filter(x => x.split(' ').length >= 2); if (ps.length) put('fil', ps.join('\n')); }
+    else if (f === 'end') put('end', v.replace(/^(?:n[ao]|em|à|a)\s+/i, ''));
+    else if (f === 'tel') { const re = /\+?\(?\d[\d\s().\-]{6,22}\d/g; let t, any = false, end = 0; while ((t = re.exec(v))) { const d = exPhoneDigits(t[0]); if (d) { put('tel', exPhoneFmt(d)); any = true; end = t.index + t[0].length; } } if (!any) continue; upto(end); }
+    else if (f === 'placa' || f === 'veic') { const ps = platesIn(v), desc = v.replace(/\b[A-Za-z]{3}[\s.-]?\d[A-Za-z0-9]\d{2}\b/g, ' ').replace(/\b(?:de\s+)?placas?\b\s*(?:n[º°o.]*)?\s*:?/gi, ' ').replace(/[\s,;:\-–]+$/, '').replace(/\s+/g, ' ').trim();
+      if (ps.length) ps.forEach((p, n) => { const raw2 = (v.match(new RegExp(p.slice(0, 3) + '[\\s.-]?' + p[3] + '[A-Z0-9]' + p.slice(5), 'i')) || [p])[0].toUpperCase().replace(/[^A-Z0-9]/g, ''); put('veic', (n === 0 && f === 'veic' && desc ? desc + ' ' : '') + plateFmt(raw2)); });
+      else if (f === 'veic' && desc.length >= 3) put('veic', desc); else continue; }
+    else if (f === 'nat') put('nat', v); else if (f === 'prof') put('prof', v);
+    else if (f === 'rede') put('rede', (/^(?:redes?)/i.test(lab) ? '' : lab.charAt(0).toUpperCase() + lab.slice(1).toLowerCase() + ': ') + v);
+    spans.push([i0, vs + used]);
+  }
+  return {ents, anchors, spans};
+}
+
+/* ============ v0.8 (parte B) — Leitura de CNH por modelo (moldura) e CNH digital em PDF — by @aiforge.team ============ */
+/* ATENÇÃO: o CONTRAN (Res. 718/2017 e 886/2021) publica os campos e a ordem do anverso, mas NÃO as coordenadas.
+   As zonas abaixo são uma ESTIMATIVA ajustável (percentuais). Se a leitura por zona ficar fraca, cai para OCR da
+   página inteira + extrator “Campo: valor”. Tudo roda no aparelho; nada é enviado. */
+const CNH_WL_NAME = 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÀÂÃÇÉÊÍÓÔÕÚÜ ', CNH_WL_NUM = '0123456789./- ', CNH_WL_RG = '0123456789./-X ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const CNH_TEMPLATES = [{
+  id: 'fisica', label: 'CNH cartão (anverso)', ratio: 1.585, pad: {x: .012, y: .015},
+  // zonas do VALOR (o rótulo impresso fica acima/fora da zona). x,y,w,h em fração do cartão recortado
+  zones: {
+    nome:   {x: .300, y: .140, w: .685, h: .095, wl: CNH_WL_NAME, psm: '7', type: 'name'},
+    doc:    {x: .300, y: .275, w: .290, h: .080, wl: CNH_WL_RG,   psm: '7', type: 'rg'},
+    cpf:    {x: .590, y: .275, w: .200, h: .080, wl: CNH_WL_NUM,  psm: '7', type: 'cpf'},
+    nasc:   {x: .790, y: .275, w: .200, h: .080, wl: CNH_WL_NUM,  psm: '7', type: 'date'},
+    fil:    {x: .300, y: .405, w: .685, h: .255, wl: CNH_WL_NAME, psm: '6', type: 'fil'},
+    registro:{x: .015, y: .760, w: .300, h: .090, wl: CNH_WL_NUM, psm: '7', type: 'num'},
+    validade:{x: .320, y: .760, w: .235, h: .090, wl: CNH_WL_NUM, psm: '7', type: 'date'},
+    cat:    {x: .800, y: .760, w: .190, h: .090, wl: 'ABCDE ',    psm: '7', type: 'cat'}
+  }
+}];
+function canvasOf(img, maxSide = 1800) { // imagem → canvas simples (cores), para recortar zonas
+  const k = Math.min(1, maxSide / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+  const c = document.createElement('canvas'); c.width = Math.round((img.naturalWidth || img.width) * k); c.height = Math.round((img.naturalHeight || img.height) * k);
+  const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(img, 0, 0, c.width, c.height); return c;
+}
+const cnhStripLabels = s => String(s || '').replace(/\b(?:NOME|SOBRENOME|DOC|DOCUMENTO|IDENTIDADE|ORG|[ÓO]RG[ÃA]O|EMISSOR|EXPEDIDOR|UF|CPF|DATA|NASCIMENTO|NASC|FILIA[ÇC][ÃA]O|PAI|M[ÃA]E|REGISTRO|N[º°O]|VALIDADE|CATEGORIA|CAT|HAB|HABILITA[ÇC][ÃA]O|LOCAL|PERMISS[ÃA]O|RENACH|ASSINATURA|PORTADOR)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+const cnhClean = s => cnhStripLabels(s).replace(/[|_]/g, ' ').replace(/\s+/g, ' ').trim();
+async function cnhZoneRead(cv, z, onProg) {
+  const P = CNH_TEMPLATES[0].pad || {x: 0, y: 0}, w = cv.width, h = cv.height; // folga: tolera cantos ajustados com pequeno erro
+  const x0 = Math.max(0, (z.x - P.x) * w), y0 = Math.max(0, (z.y - P.y) * h), r = {x: x0, y: y0, w: Math.min(w - x0, (z.w + 2 * P.x) * w), h: Math.min(h - y0, (z.h + 2 * P.y) * h)};
+  const zc = ocrCanvas(cv, r, 1600, 150); // upscale: zonas pequenas rendem mais com altura mínima
+  const data = await runOcr(zc, {tessedit_char_whitelist: z.wl, tessedit_pageseg_mode: z.psm}, onProg);
+  return {text: (data.text || '').trim(), conf: Math.max(0, Math.round(data.confidence || 0))};
+}
+/* lê um cartão de CNH já recortado/endireitado: zona a zona, com reserva de página inteira */
+async function cnhReadCanvas(cv, onProg) {
+  const tpl = CNH_TEMPLATES[0], ex = {nome: '', cpfs: [], rg: '', nasc: '', filiacao: [], registro: '', validade: '', cat: '', cnh: true}, conf = {}, rawParts = [];
+  let i = 0; const zkeys = Object.keys(tpl.zones);
+  for (const key of zkeys) {
+    if (!KEY) return null; const z = tpl.zones[key];
+    const {text, conf: c} = await cnhZoneRead(cv, z, m => onProg && onProg(m, i / zkeys.length)); i++;
+    rawParts.push(`[${key}] ${text}`);
+    if (z.type === 'name') { const n = nameLine(cnhClean(text)); if (n) { ex.nome = titleName(n); conf.nome = c; } }
+    else if (z.type === 'cpf') { const f = findCPFs(text); if (f.length) { ex.cpfs = f; conf.cpf = c; } }
+    else if (z.type === 'date') { const d = findDates(text); if (d.length) { ex[key === 'nasc' ? 'nasc' : 'validade'] = d[0].iso; conf[key] = c; } }
+    else if (z.type === 'rg') { const d = cnhClean(text), num = (d.match(/\d[\d.\-\/]{3,}[\dX]?/i) || [''])[0].replace(/\s/g, ''); const om = d.toUpperCase().match(/\b(SSPDS|SSP|SDS|DETRAN|PCCE|PC|IFP|SESP|SEJUSP|DGPC|SJS|SESDEC|SSPDC)\s*[-\/]?\s*(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)?\b/), org = om ? om[1] + (om[2] ? '/' + om[2] : '') : ''; if (num) { ex.rg = num + (org ? ' ' + org.toUpperCase() : ''); conf.rg = c; } }
+    else if (z.type === 'fil') { const ps = text.split(/\n+|\s{3,}/).map(cnhClean).map(x => x.replace(/[^A-Za-zÀ-ÿ' ]+/g, ' ').replace(/\s+/g, ' ').trim()).filter(x => x.split(' ').filter(w => w.length >= 2).length >= 2).map(titleName); if (ps.length) { ex.filiacao = ps.slice(0, 2); conf.fil = c; } }
+    else if (z.type === 'num') { const n = (cnhClean(text).match(/\d[\d.\-\/]{6,}\d/) || [''])[0].replace(/\D/g, ''); if (n) { ex.registro = n; conf.registro = c; } }
+    else if (z.type === 'cat') { const g = (text.toUpperCase().match(/\b[A-E]{1,5}\b/) || [''])[0]; if (g) { ex.cat = g; conf.cat = c; } }
+  }
+  // reserva: se os campos-chave vieram fracos, OCR da página inteira + extrator por rótulos
+  const low = k => conf[k] == null || conf[k] < (k === 'nome' ? 80 : 70) || (k === 'nome' && (ex.nome.split(' ')[0] || '').length < 3);
+  if (low('nome') || low('cpf') || !ex.cpfs.length || !ex.cpfs[0].ok || !ex.nasc || ex.nome.split(' ').length < 2) {
+    if (!KEY) return null; const full = await runOcr(ocrCanvas(cv, null, 2000), {tessedit_pageseg_mode: '3'}, m => onProg && onProg(m, .9));
+    const fx = extractDoc(full.text); rawParts.push('[página inteira]\n' + full.text);
+    if ((!ex.nome || low('nome')) && fx.nome && fx.nome.split(' ').length >= 2) { ex.nome = fx.nome; conf.nome = 60; }
+    if ((!ex.cpfs.length || !ex.cpfs[0].ok) && fx.cpfs.length) { ex.cpfs = fx.cpfs; conf.cpf = conf.cpf || 60; }
+    if (!ex.rg && fx.rg) { ex.rg = fx.rg; conf.rg = conf.rg || 60; }
+    if (!ex.nasc && fx.nasc) { ex.nasc = fx.nasc; conf.nasc = conf.nasc || 60; }
+    if ((!ex.filiacao.length || low('fil')) && fx.filiacao.length) { ex.filiacao = fx.filiacao; conf.fil = 60; }
+    ex.fallback = true;
+  }
+  return {ex, conf, raw: rawParts.join('\n'), template: tpl.id};
+}
+const cnhObs = ex => [ex.registro ? 'Nº Registro: ' + ex.registro : '', ex.validade ? 'Validade: ' + dateBR(ex.validade) : '', ex.cat ? 'Categoria: ' + ex.cat : ''].filter(Boolean).join(' · ');
+
+/* ---- warp: 4 cantos (TL,TR,BR,BL em px da origem) → retângulo outW×outH (dois triângulos afins) ---- */
+function cnhAffine(s, d) { // matriz que leva o triângulo s no d
+  const [[sx0, sy0], [sx1, sy1], [sx2, sy2]] = s, [[dx0, dy0], [dx1, dy1], [dx2, dy2]] = d;
+  const den = (sx1 - sx0) * (sy2 - sy0) - (sx2 - sx0) * (sy1 - sy0) || 1e-6;
+  const a = ((dx1 - dx0) * (sy2 - sy0) - (dx2 - dx0) * (sy1 - sy0)) / den;
+  const b = ((dx2 - dx0) * (sx1 - sx0) - (dx1 - dx0) * (sx2 - sx0)) / den;
+  const c = ((dy1 - dy0) * (sy2 - sy0) - (dy2 - dy0) * (sy1 - sy0)) / den;
+  const dd = ((dy2 - dy0) * (sx1 - sx0) - (dy1 - dy0) * (sx2 - sx0)) / den;
+  return {a, b, c, d: dd, e: dx0 - a * sx0 - b * sy0, f: dy0 - c * sx0 - dd * sy0};
+}
+function cnhWarp(src, corners, outW, outH) { // corners: [TL,TR,BR,BL]
+  const out = document.createElement('canvas'); out.width = outW; out.height = outH; const ctx = out.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+  const dst = [[0, 0], [outW, 0], [outW, outH], [0, outH]], tris = [[0, 1, 3], [1, 2, 3]];
+  for (const [i, j, k] of tris) {
+    const s = [corners[i], corners[j], corners[k]], d = [dst[i], dst[j], dst[k]], m = cnhAffine(s, d);
+    ctx.save(); ctx.beginPath(); ctx.moveTo(d[0][0], d[0][1]); ctx.lineTo(d[1][0], d[1][1]); ctx.lineTo(d[2][0], d[2][1]); ctx.closePath(); ctx.clip();
+    ctx.setTransform(m.a, m.c, m.b, m.d, m.e, m.f); ctx.drawImage(src, 0, 0); ctx.restore(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+  return out;
+}
+
+/* ---- tela de ajuste de cantos (comum à foto do álbum e à captura da câmera) ---- */
+function cnhCornerUI(srcCanvas, onReady, onCancel, inset = .06) {
+  const ratio = CNH_TEMPLATES[0].ratio, maxW = Math.min(360, srcCanvas.width), scale = maxW / srcCanvas.width, dispW = Math.round(srcCanvas.width * scale), dispH = Math.round(srcCanvas.height * scale);
+  const C = [[dispW * inset, dispH * inset], [dispW * (1 - inset), dispH * inset], [dispW * (1 - inset), dispH * (1 - inset)], [dispW * inset, dispH * (1 - inset)]];
+  sheet(`<h2 style="margin-top:0">🪪 Ajustar cantos da CNH</h2><div class="sub" style="margin:0 0 8px;line-height:1.4">Arraste os quatro cantos para encaixar na <b>borda do cartão</b> (ou da área de dados). Depois toque em <b>Endireitar e ler</b>.</div>
+    <div class="cnhwrap" id="cnhw" style="width:${dispW}px;height:${dispH}px"><canvas id="cnhc" width="${dispW}" height="${dispH}"></canvas><svg id="cnhsvg" width="${dispW}" height="${dispH}" style="position:absolute;inset:0"><polygon id="cnhpoly" fill="rgba(90,140,255,.12)" stroke="#5a8cff" stroke-width="2"/></svg>${C.map((_, i) => `<div class="cnhh" data-i="${i}"></div>`).join('')}</div>
+    <div class="gap"></div><div class="btn pri" id="cnh_go">Endireitar e ler</div><div class="btn" id="cnh_cn" style="margin-top:10px">Cancelar</div>`, s => {
+    const cv = s.querySelector('#cnhc'); cv.getContext('2d').drawImage(srcCanvas, 0, 0, dispW, dispH);
+    const poly = s.querySelector('#cnhpoly'), hs = [...s.querySelectorAll('.cnhh')];
+    const paint = () => { poly.setAttribute('points', C.map(p => p.join(',')).join(' ')); hs.forEach((h, i) => { h.style.left = C[i][0] + 'px'; h.style.top = C[i][1] + 'px'; }); };
+    paint();
+    const wrap = s.querySelector('#cnhw'); let drag = -1;
+    const pt = e => { const r = wrap.getBoundingClientRect(), t = e.touches ? e.touches[0] : e; return [Math.max(0, Math.min(dispW, t.clientX - r.left)), Math.max(0, Math.min(dispH, t.clientY - r.top))]; };
+    hs.forEach(h => { const start = e => { drag = +h.dataset.i; e.preventDefault(); }; h.addEventListener('mousedown', start); h.addEventListener('touchstart', start, {passive: false}); });
+    const move = e => { if (drag < 0) return; C[drag] = pt(e); paint(); e.preventDefault(); }; const up = () => drag = -1;
+    wrap.addEventListener('mousemove', move); wrap.addEventListener('touchmove', move, {passive: false}); window.addEventListener('mouseup', up); window.addEventListener('touchend', up);
+    s.querySelector('#cnh_cn').onclick = () => { closeSheet(); onCancel && onCancel(); };
+    s.querySelector('#cnh_go').onclick = () => {
+      const inv = 1 / scale, corners = C.map(([x, y]) => [x * inv, y * inv]);
+      const wTop = Math.hypot(corners[1][0] - corners[0][0], corners[1][1] - corners[0][1]), wBot = Math.hypot(corners[2][0] - corners[3][0], corners[2][1] - corners[3][1]);
+      const hL = Math.hypot(corners[3][0] - corners[0][0], corners[3][1] - corners[0][1]), hR = Math.hypot(corners[2][0] - corners[1][0], corners[2][1] - corners[1][1]);
+      const outW = Math.round(Math.max(wTop, wBot, 900)), outH = Math.round(outW / ratio);
+      onReady(cnhWarp(srcCanvas, corners, outW, outH));
+    };
+  });
+}
+/* roda a leitura por zona sobre o canvas endireitado e abre a conferência (igual à de documento) */
+async function cnhProcess(warped, onDone, batchCb) {
+  const prog = ocrBusySheet('🪪 Lendo a CNH (modelo)…'); const st = () => $('#oc_st'), bar = () => $('#oc_bar');
+  try {
+    const r = await cnhReadCanvas(warped, (m, frac) => { prog(m); if (st()) st().textContent = 'Lendo os campos da CNH…'; if (bar() && frac != null) bar().style.width = Math.round(frac * 100) + '%'; });
+    if (!r || !KEY) return;
+    const blob = await new Promise(res => warped.toBlob(res, 'image/jpeg', .9)); const buf = await blob.arrayBuffer(); const img = new Uint8Array(buf);
+    if (batchCb) return batchCb(r, img, blob);
+    if (!$('#oc_st')) return; docReview(r.ex, r.raw, img, onDone, r.conf);
+  } catch (e) { console.warn('CNH', e); if (KEY) { closeSheet(); toast('Leitura da CNH falhou: ' + e.message); } }
+}
+function cnhFromImageFile(file, onDone) { loadImg(file).then(li => { const cv = canvasOf(li.img, 1800); URL.revokeObjectURL(li.u); cnhCornerUI(cv, warped => cnhProcess(warped, onDone), null); }).catch(e => toast('Imagem inválida')); }
+/* câmera ao vivo com moldura; se a câmera não abrir, cai para o álbum */
+function cnhCamera(onDone) {
+  let stream = null;
+  const stop = () => { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; release(); } };
+  sheet(`<h2 style="margin-top:0">🪪 Ler CNH (modelo)</h2><div class="sub" style="margin:0 0 8px;line-height:1.4">Encaixe a CNH na moldura, com <b>boa luz</b> e <b>sem reflexo</b>. Toque em <b>Capturar</b>.</div>
+    <div class="cnhcam"><video id="cnhv" playsinline autoplay muted></video><div class="cnhframe" style="aspect-ratio:${CNH_TEMPLATES[0].ratio}"></div></div>
+    <div class="gap"></div><div class="btn pri" id="cnh_cap">📸 Capturar</div><div class="btn" id="cnh_alb" style="margin-top:10px">🖼️ Escolher do álbum</div><div class="btn" id="cnh_cn" style="margin-top:10px">Cancelar</div>`, async s => {
+    const v = s.querySelector('#cnhv');
+    s.querySelector('#cnh_cn').onclick = () => { stop(); closeSheet(); };
+    s.querySelector('#cnh_alb').onclick = () => { stop(); closeSheet(); ocrPickAlbum(f => cnhFromImageFile(f, onDone)); };
+    s.querySelector('#cnh_cap').onclick = () => {
+      if (!v.videoWidth) return toast('Aguarde a câmera abrir ou use o álbum');
+      const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
+      // recorta exatamente o que aparece dentro da moldura: retângulo da moldura na tela → pixels do vídeo (considera o object-fit: cover)
+      const vr = v.getBoundingClientRect(), frR = s.querySelector('.cnhframe').getBoundingClientRect(), k = Math.max(vr.width / c.width, vr.height / c.height);
+      const ox = (vr.width - c.width * k) / 2, oy = (vr.height - c.height * k) / 2;
+      let fx = (frR.left - vr.left - ox) / k, fy = (frR.top - vr.top - oy) / k, fw = frR.width / k, fh = frR.height / k;
+      fx = Math.max(0, fx); fy = Math.max(0, fy); fw = Math.min(c.width - fx, fw); fh = Math.min(c.height - fy, fh);
+      const crop = document.createElement('canvas'); crop.width = Math.round(fw); crop.height = Math.round(fh); crop.getContext('2d').drawImage(c, fx, fy, fw, fh, 0, 0, crop.width, crop.height);
+      stop(); cnhCornerUI(crop, warped => cnhProcess(warped, onDone), () => cnhCamera(onDone), .01);
+    };
+    try { stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: 'environment'}, width: {ideal: 1920}}, audio: false}); v.srcObject = stream; hold(300000); v.onloadedmetadata = () => { const box = s.querySelector('.cnhcam'); if (box && v.videoWidth) { box.style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; box.style.width = `min(100%, calc(56vh * ${(v.videoWidth / v.videoHeight).toFixed(4)}))`; } v.play().catch(() => {}); }; }
+    catch (e) { console.warn('cam', e); const al = $('#cnh_cap'); if (al) { const note = document.createElement('div'); note.className = 'warn'; note.innerHTML = '⚠️ Não consegui abrir a câmera aqui (permissão ou navegador). Use <b>Escolher do álbum</b>.'; al.parentNode.insertBefore(note, al); } }
+  });
+}
+function ocrPickAlbum(cb) { pickFile('image/*', cb); }
+function cnhStart(onDone) {
+  sheet(`<h2 style="margin-top:0">🪪 Ler CNH (modelo)</h2><div class="sub" style="line-height:1.45;margin-bottom:6px">Leitura por <b>moldura</b>: encaixe a CNH, o app endireita e lê cada campo na posição dele — costuma acertar mais que ler o documento inteiro como texto. Tudo no aparelho.</div>
+    <div class="btn pri" id="cs_cam">📷 Abrir câmera</div><div class="btn" id="cs_alb" style="margin-top:10px">🖼️ Escolher do álbum</div>
+    <div class="warn" style="margin-bottom:0">As posições dos campos são uma <b>estimativa</b> do modelo da CNH e podem precisar de ajuste; se a leitura sair fraca, o app tenta ler a página inteira. Sempre confira antes de salvar.</div>`, s => {
+    s.querySelector('#cs_cam').onclick = () => { closeSheet(); cnhCamera(onDone); };
+    s.querySelector('#cs_alb').onclick = () => { closeSheet(); ocrPickAlbum(f => cnhFromImageFile(f, onDone)); };
+  });
+}
+
+/* ============ CNH digital em PDF (CNH-e / Carteira Digital de Trânsito) ============ */
+/* Sem amostra real: o parser é por POSIÇÃO de rótulo (rótulo → valor ao lado/abaixo), tolerante a ordem e quebras.
+   A fixture de teste é sintética (reportlab) imitando rótulos/valores. Caveat relatado ao usuário. */
+async function cnhePdfItems(pdf) {
+  const pg = await pdf.getPage(1), tc = await pg.getTextContent(); const items = [];
+  for (const it of tc.items) { if (!('str' in it) || !it.str.trim()) continue; const t = it.transform; items.push({s: it.str.trim(), x: t[4], y: t[5], h: Math.abs(t[3]) || it.height || 8, w: it.width || 0}); }
+  pg.cleanup(); return items;
+}
+const CNHE_SIG = /(?:CARTEIRA\s+NACIONAL\s+DE\s+HABILITA[ÇC][ÃA]O|CARTEIRA\s+DIGITAL\s+DE\s+TR[ÂA]NSITO)/i;
+function cnheDetect(items) { const all = _norm(items.map(i => i.s).join(' ')); if (!CNHE_SIG.test(items.map(i => i.s).join(' '))) return false;
+  let n = 0; for (const re of [/\bnome\b/, /\bcpf\b/, /\bfilia[cç][aã]o\b/, /\bnº?\s*registro\b|\bregistro\b/, /\bvalidade\b/, /\bnascimento\b/, /\bidentidade\b/, /\bcategoria\b|\bcat\b/]) if (re.test(all)) n++; return n >= 4; }
+/* agrupa itens em linhas (por y), ordena por x */
+function cnheLines(items) {
+  const srt = items.slice().sort((a, b) => b.y - a.y || a.x - b.x), lines = [];
+  for (const it of srt) { const L = lines.find(l => Math.abs(l.y - it.y) <= Math.max(3, it.h * .6)); if (L) { L.items.push(it); L.y = (L.y * L.items.length + it.y) / (L.items.length + 1); } else lines.push({y: it.y, items: [it]}); }
+  lines.forEach(l => { l.items.sort((a, b) => a.x - b.x); l.text = l.items.map(i => i.s).join(' ').replace(/\s+/g, ' ').trim(); l.x = l.items[0].x; });
+  return lines;
+}
+const CNHE_LABELS = [
+  ['nome', /^(?:nome(?:\s+e\s+sobrenome|\s+social|\s+civil|\s+completo)?)\s*:?\.?$/],
+  ['rg', /^(?:(?:n[º°o.]*\s*)?doc(?:umento)?\.?\s*(?:de\s+)?identidade.*|identidade|rg)\s*:?\.?$/],
+  ['cpf', /^(?:n[º°o.]*\s*)?cpf\s*:?\.?$/],
+  ['nasc', /^(?:data\b.{0,25}\bnascimento|nascimento|data\s+nasc\.?)\s*:?\.?$/],
+  ['fil', /^filia[cç][aã]o\s*:?\.?$/],
+  ['registro', /^(?:n[º°o.]*\s*)?registro\s*:?\.?$/],
+  ['validade', /^validade\s*:?\.?$/],
+  ['cat', /^(?:cat\.?|categoria)(?:\s*hab\.?)?\s*:?\.?$/],
+  ['local', /^(?:local\s*(?:e\s*uf)?|naturalidade)\s*:?\.?$/]
+];
+const cnheLabelOf = s => { const n = _norm(s).replace(/:.*$/, '').trim().replace(/^\d{1,2}[a-z]?(?:\s*(?:e|,|\/)\s*\d{1,2}[a-z]?)*\s*[.)\-]?\s+(?=[a-z])/, ''); for (const [f, re] of CNHE_LABELS) if (re.test(n)) return f; return null; };
+/* valor de um rótulo (por coluna): itens à direita na mesma linha até o próximo rótulo; senão os itens da(s) linha(s) abaixo
+   cujo x cai na coluna do rótulo [x-30, x do próximo rótulo da linha) */
+function cnheValue(lines, li, it, wantNames, f) {
+  const L0 = lines[li], idx = L0.items.indexOf(it), after = L0.items.slice(idx + 1);
+  const inl = it.s.includes(':') ? it.s.replace(/^[^:]*:/, '').trim() : ''; if (inl) return [inl];
+  // à direita na mesma linha só vale como VALOR se o rótulo termina em “:”, se a letra é maior (valor em destaque) ou se tem cara do campo;
+  // outro texto do tamanho do rótulo (ex.: “1ª HABILITAÇÃO”, “DATA EMISSÃO”) é outro cabeçalho e fecha a coluna
+  const looks = s => /^(?:cpf|registro|validade|nasc)$/.test(f) ? /\d{2}/.test(s) : f === 'cat' ? /^[A-E]{1,5}$/.test(s.trim()) : false;
+  const isVal = x => !cnheLabelOf(x.s) && (/:\s*$/.test(it.s) || x.h > it.h * 1.12 || looks(x.s));
+  const right = []; let stopX = Infinity; for (const x of after) { if (isVal(x)) right.push(x.s); else { stopX = x.x; break; } }
+  if (right.length) return [right.join(' ').replace(/^:\s*/, '').trim()];
+  const x1 = stopX - 4;
+  const out = [];
+  for (let k = li + 1; k < lines.length && out.length < (wantNames ? 2 : 1); k++) {
+    const L = lines[k], col = L.items.filter(x => x.x >= it.x - 30 && x.x < x1);
+    if (!col.length) { if (out.length) break; if (L0.y - L.y > it.h * 4) break; continue; }
+    if (col.some(x => cnheLabelOf(x.s))) break;
+    out.push(col.map(x => x.s).join(' ').trim());
+  }
+  return out;
+}
+function cnheExtract(items) {
+  if (!cnheDetect(items)) return null;
+  const lines = cnheLines(items), c = exCard({lab: true, exact: true, cnh: true}), got = {}; const loose = [];
+  lines.forEach((L, li) => { for (const it of L.items) { const f = cnheLabelOf(it.s); if (!f || got[f]) continue; got[f] = true;
+    const vals = cnheValue(lines, li, it, f === 'fil', f); if (!vals.length) continue;
+    if (f === 'nome') { const nm = exNameFix(vals[0]); if (nm) exPut(c, exItem('nome', nm), loose); }
+    else if (f === 'cpf') { const d = _digits(vals[0]); if (d.length === 11) exPut(c, exItem('cpf', cpfFmt(d), cpfValid(d)), loose); }
+    else if (f === 'nasc') { const m = vals[0].match(/\d{1,2}\s*[\/.\-]\s*\d{1,2}\s*[\/.\-]\s*\d{4}/), iso = exDateISO(m ? m[0] : vals[0]); if (iso) exPut(c, exItem('nasc', iso), loose);
+      const loc = m ? vals[0].slice(m.index + m[0].length).replace(/^[\s,;\-]+/, '').trim() : ''; if (loc && /[A-Za-zÀ-ÿ]{3}/.test(loc) && !got.local) { got.local = true; c.obs = [c.obs, 'Naturalidade: ' + loc].filter(Boolean).join('\n'); } }
+    else if (f === 'rg') { const d = vals[0].replace(/\s+/g, ' ').trim(); if (d) exPut(c, exItem('rg', d.replace(/\s*-\s*(?=[A-Z]{2,8}\b)/, ' ')), loose); }
+    else if (f === 'fil') { const ps = vals.map(exNameFix).filter(x => x.split(' ').length >= 2); if (ps.length) exPut(c, exItem('fil', ps.join('\n')), loose); }
+    else if (f === 'registro') { const d = _digits(vals[0]); if (d.length >= 6) c.obs = [c.obs, 'Nº Registro: ' + d].filter(Boolean).join('\n'); }
+    else if (f === 'validade') { const m = vals[0].match(/(\d{1,2})\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-]\s*(\d{4})/), iso = m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : ''; if (iso) c.obs = [c.obs, 'Validade: ' + dateBR(iso)].filter(Boolean).join('\n'); }
+    else if (f === 'cat') { const g = (vals[0].toUpperCase().match(/\b[A-E]{1,5}\b/) || [''])[0]; if (g) c.obs = [c.obs, 'Categoria: ' + g].filter(Boolean).join('\n'); }
+    else if (f === 'local') { if (vals[0]) c.obs = [c.obs, 'Naturalidade: ' + vals[0].replace(/\s+/g, ' ').trim()].filter(Boolean).join('\n'); }
+  } });
+  if (!c.nome && !c.cpf) return null;
+  c.inc = true; return {cards: [c], loose, exact: {kind: 'cnh', n: 1, ignored: 0}};
+}
+
 /* menu com os modos de importação (usado na Importação em lote) */
 const exModesHtml = () => `<div class="card glass" style="cursor:default;padding:0;margin:0 0 6px"><div class="tgrow" id="mo_ex" style="cursor:pointer"><div>🧾 Extrair de texto/documento<div class="sub">BO, relatório, WhatsApp, PDF ou Word → pessoas para conferir</div></div><span class="sub">›</span></div><div class="tgrow" id="mo_doc" style="cursor:pointer"><div>🪪 Ler documentos em lote<div class="sub">várias fotos de RG/CNH (OCR no aparelho)</div></div><span class="sub">›</span></div><div class="tgrow" id="mo_ph" style="cursor:pointer"><div>🖼️ Fotos em lote pelo nome<div class="sub">arquivos com CPF ou nome do alvo</div></div><span class="sub">›</span></div></div>`;
 function exModesBind(root, opId) { const b = (id, fn) => { const el = root.querySelector(id); if (el) el.onclick = fn; };
